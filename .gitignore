@@ -59,6 +59,11 @@ coverage.xml
 Thumbs.db
 Desktop.ini
 
+# Runtime / generated output
+work_files/
+output/
+temp/
+
 # Project specific
 screenshots/
 *.png
