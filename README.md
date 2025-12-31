@@ -4,18 +4,55 @@ Automated screenshot capture tool for web pages with full-page scrolling support
 
 ## Prerequisites
 
-- Python 3.13.0 or higher
+- Python 3.11 or higher
 - Google Chrome browser installed
 
-## Setup Instructions
+## Quick Start
+
+### Installation (One-Time Setup)
+
+**Easy Way (Recommended) - Run the installation script:**
+
+- **Windows PowerShell:** Right-click `install.ps1` → Run with PowerShell
+- **Windows Command Prompt:** Double-click `install.bat`
+
+Or run from command line:
+```powershell
+# PowerShell
+.\install.ps1
+
+# Command Prompt
+install.bat
+```
+
+The installation script will:
+1. Check for Python installation
+2. Create a virtual environment (`venv/`)
+3. Install all required dependencies
+4. Verify the installation
+
+### Running the Application
+
+**Easy Way (Recommended) - Double-click one of these:**
+- `run_app.bat` - For Command Prompt
+- `run_app.ps1` - For PowerShell (right-click → Run with PowerShell)
+
+These launcher scripts automatically:
+- Check if the virtual environment exists
+- Dynamically detect and set Tcl/Tk paths (fixes tkinter GUI issues)
+- Install missing dependencies if needed
+- Run the application
+- Keep the window open if there's an error
+
+## Manual Setup (Alternative)
+
+If you prefer to set up manually:
 
 ### 1. Create Virtual Environment
 
-Each project gets its own isolated environment to avoid dependency conflicts:
-
 ```powershell
 # Navigate to project directory
-cd C:\Users\james\full_screen_shots_
+cd C:\Users\james\auto_capture_tool
 
 # Create virtual environment
 python -m venv venv
@@ -44,35 +81,11 @@ With the virtual environment activated:
 pip install -r requirements.txt
 ```
 
-Or use the modern approach with pyproject.toml:
+### 4. Run the Application Manually
 
 ```powershell
-pip install -e .
-```
-
-### 4. Run the Application
-
-**Easy Way (Recommended) - Double-click one of these:**
-- `run_app.bat` - For Command Prompt
-- `run_app.ps1` - For PowerShell (right-click → Run with PowerShell)
-
-These launchers automatically:
-- Activate the virtual environment
-- Set required Tcl/Tk paths for GUI
-- Run the application
-- Keep the window open if there's an error
-
-**Manual Way:**
-```powershell
-# Activate virtual environment
-.\venv\Scripts\Activate.ps1
-
-# Set Tcl/Tk paths (fixes GUI issues)
-$env:TCL_LIBRARY = "C:\Users\james\AppData\Local\Programs\Python\Python313\tcl\tcl8.6"
-$env:TK_LIBRARY = "C:\Users\james\AppData\Local\Programs\Python\Python313\tcl\tk8.6"
-
-# Run application
-python Auto_Capture_Tool.py
+# Using venv Python directly (recommended)
+.\venv\Scripts\python.exe Auto_Capture_Tool.py
 ```
 
 ## Updating Dependencies
@@ -98,10 +111,13 @@ deactivate
 ## Project Structure
 
 ```
-full_screen_shots_/
-├── venv/                      # Virtual environment (not in git)
+auto_capture_tool/
+├── venv/                      # Virtual environment (not in git, created by install script)
 ├── Auto_Capture_Tool.py       # Main application
-├── install.py                 # Legacy installer (use requirements.txt instead)
+├── install.bat                # 🚀 Installation script for CMD
+├── install.ps1                # 🚀 Installation script for PowerShell
+├── install.py                 # Legacy installer (use install.ps1/install.bat instead)
+├── detect_tcl_tk.py           # Helper script to detect Tcl/Tk paths
 ├── run_app.bat                # 🚀 Quick launcher for CMD
 ├── run_app.ps1                # 🚀 Quick launcher for PowerShell
 ├── requirements.txt           # Pinned dependencies
@@ -119,23 +135,48 @@ full_screen_shots_/
 
 ## Troubleshooting
 
+### Virtual Environment Not Found Error
+
+If you see "Virtual environment not found", run the installation script first:
+```powershell
+.\install.ps1  # PowerShell
+# or
+install.bat    # Command Prompt
+```
+
 ### Tkinter GUI Error (`Can't find a usable init.tcl`)
 
-If you see this error, use the provided launcher scripts (`run_app.bat` or `run_app.ps1`) which automatically fix this issue. They set the correct Tcl/Tk library paths.
+The launcher scripts (`run_app.bat` or `run_app.ps1`) automatically detect and set the correct Tcl/Tk library paths. If you still encounter this error:
+
+1. Make sure you're using the launcher scripts (not running Python directly)
+2. If the error persists, the Python installation may be corrupted - try reinstalling Python
 
 ### Python Command Not Found
 
-Make sure Python 3.13 is installed and in your PATH, or use the full path:
+Make sure Python 3.11 or higher is installed and in your PATH. You can check by running:
 ```powershell
-C:\Users\james\AppData\Local\Programs\Python\Python313\python.exe -m venv venv
+python --version
 ```
+
+If Python is not found, install it from [python.org](https://www.python.org/downloads/) and make sure to check "Add Python to PATH" during installation.
 
 ### Module Not Found Errors
 
-Make sure you've activated the virtual environment and installed dependencies:
+If you see module not found errors, the dependencies may not be installed. Run:
 ```powershell
-.\venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Or simply run the installation script again:
+```powershell
+.\install.ps1
+```
+
+### Permission Errors on Windows
+
+If you get execution policy errors in PowerShell, you may need to allow script execution:
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
 ## Notes

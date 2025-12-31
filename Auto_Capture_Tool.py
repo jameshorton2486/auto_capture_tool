@@ -57,6 +57,12 @@ class AutoCaptureTool:
         self.driver = None
         self.root_save_directory = ""
         self.is_running = False
+        self.browser_opened_for_login = False  # Track if browser was opened manually
+        
+        # Chrome profile directory for persistent sessions
+        profile_dir = os.path.join(os.path.expanduser("~"), ".auto_capture_tool")
+        os.makedirs(profile_dir, exist_ok=True)
+        self.chrome_user_data_dir = os.path.join(profile_dir, "chrome_profile")
 
         self._apply_styles()
         self._build_ui()
@@ -177,6 +183,18 @@ class AutoCaptureTool:
             activebackground=DarkTheme.BG_PANEL
         )
         chk_skip.pack(anchor="w")
+        
+        self.persist_session_var = tk.BooleanVar(value=False)
+        chk_persist = tk.Checkbutton(
+            opt_frame,
+            text="Keep login sessions (save Chrome profile between runs)",
+            variable=self.persist_session_var,
+            bg=DarkTheme.BG_PANEL,
+            fg=DarkTheme.FG_TEXT,
+            selectcolor=DarkTheme.BG_INPUT,
+            activebackground=DarkTheme.BG_PANEL
+        )
+        chk_persist.pack(anchor="w")
 
         # ---------- FORMAT + SETTINGS ----------
         settings_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=10)
@@ -312,6 +330,17 @@ class AutoCaptureTool:
             pady=4
         )
         self.zip_btn.pack(side=tk.LEFT, padx=5)
+        
+        self.login_btn = tk.Button(
+            btn_frame,
+            text="Open Browser",
+            command=self.open_browser_for_login,
+            bg=DarkTheme.BTN_BLUE,
+            fg="white",
+            padx=6,
+            pady=4
+        )
+        self.login_btn.pack(side=tk.LEFT, padx=5)
 
         # ---------- STATUS BAR ----------
         status_frame = ttk.Frame(self.root, style="Panel.TFrame")
@@ -521,6 +550,40 @@ class AutoCaptureTool:
         threading.Thread(target=self._capture_loop, daemon=True).start()
 
     # ==================================================
+    #              BROWSER INITIALIZATION
+    # ==================================================
+    def open_browser_for_login(self):
+        """Open browser for manual login before capturing."""
+        if self.driver is not None:
+            messagebox.showinfo("Browser Open", "Browser is already open. Close it first if you want to start fresh.")
+            return
+        
+        width = int(self.width_var.get())
+        options = Options()
+        
+        # Use persistent profile if enabled
+        if self.persist_session_var.get():
+            options.add_argument(f"--user-data-dir={self.chrome_user_data_dir}")
+            self.log("Using persistent Chrome profile for login sessions")
+        
+        try:
+            self.log("Opening browser for manual login...")
+            self.driver = webdriver.Chrome(
+                service=Service(ChromeDriverManager().install()),
+                options=options
+            )
+            self.driver.set_window_size(width, 900)
+            self.browser_opened_for_login = True
+            self.log("Browser opened. Log in to sites as needed, then click 'Start' to capture.")
+            messagebox.showinfo("Browser Opened", 
+                "Browser is now open. You can log in to websites manually.\n\n"
+                "After logging in, click 'Start' to begin capturing.\n\n"
+                "Make sure 'Keep login sessions' is checked if you want to save your login.")
+        except Exception as e:
+            self.log(f"Error opening browser: {e}")
+            messagebox.showerror("Error", f"Failed to open browser:\n{e}")
+
+    # ==================================================
     #               MAIN CAPTURE PROCESS
     # ==================================================
     def _capture_loop(self):
@@ -528,24 +591,36 @@ class AutoCaptureTool:
             width = int(self.width_var.get())
             delay = int(self.delay_var.get())
 
-            options = Options()
-            # options.add_argument("--headless")  # Uncomment for invisible browser
-            options.add_argument("--disable-cache")
-            options.add_argument("--disk-cache-size=0")
-            options.add_experimental_option("prefs", {
-                "profile.default_content_setting_values.cookies": 2  # Block cookies
-            })
+            # Initialize browser if not already open
+            if self.driver is None:
+                options = Options()
+                # options.add_argument("--headless")  # Uncomment for invisible browser
+                
+                # Use persistent profile if enabled
+                if self.persist_session_var.get():
+                    options.add_argument(f"--user-data-dir={self.chrome_user_data_dir}")
+                    self.log("Using persistent Chrome profile")
+                else:
+                    options.add_argument("--disable-cache")
+                    options.add_argument("--disk-cache-size=0")
+                    options.add_experimental_option("prefs", {
+                        "profile.default_content_setting_values.cookies": 2  # Block cookies
+                    })
 
-            def init_driver():
-                self.log("Initializing browser...")
-                new_driver = webdriver.Chrome(
-                    service=Service(ChromeDriverManager().install()),
-                    options=options
-                )
-                new_driver.set_window_size(width, 900)
-                return new_driver
+                def init_driver():
+                    self.log("Initializing browser...")
+                    new_driver = webdriver.Chrome(
+                        service=Service(ChromeDriverManager().install()),
+                        options=options
+                    )
+                    new_driver.set_window_size(width, 900)
+                    return new_driver
 
-            self.driver = init_driver()
+                self.driver = init_driver()
+            else:
+                # Browser already open (from login), just resize it
+                self.driver.set_window_size(width, 900)
+                self.log("Reusing existing browser session")
             total = len(self.items_to_process)
 
             for i, item in enumerate(self.items_to_process):
@@ -559,7 +634,23 @@ class AutoCaptureTool:
                 except Exception:
                     self.log("Browser was closed. Attempting to restart...")
                     try:
-                        self.driver = init_driver()
+                        # Recreate browser with same options
+                        options = Options()
+                        if self.persist_session_var.get():
+                            options.add_argument(f"--user-data-dir={self.chrome_user_data_dir}")
+                        else:
+                            options.add_argument("--disable-cache")
+                            options.add_argument("--disk-cache-size=0")
+                            options.add_experimental_option("prefs", {
+                                "profile.default_content_setting_values.cookies": 2
+                            })
+                        self.driver = webdriver.Chrome(
+                            service=Service(ChromeDriverManager().install()),
+                            options=options
+                        )
+                        self.driver.set_window_size(width, 900)
+                        self.browser_opened_for_login = False  # Reset flag since we're recreating
+                        self.log("Browser restarted successfully")
                     except Exception as re_init_err:
                         self.log(f"Failed to restart browser: {re_init_err}")
                         break
@@ -613,8 +704,9 @@ class AutoCaptureTool:
                             # Give user time to interact if browser is visible
                             time.sleep(3)
 
-                    # Clear browser cache/cookies between pages (after page load)
-                    self.driver.delete_all_cookies()
+                    # Only clear cookies if NOT using persistent profile (would break login sessions)
+                    if not self.persist_session_var.get():
+                        self.driver.delete_all_cookies()
 
                     self._update_progress("Capturing...", i)
                     screenshot = self._capture_full_page()
@@ -635,20 +727,27 @@ class AutoCaptureTool:
             if self.is_running:
                 if self.failed_items:
                     self.log(f"Capture process finished. {len(self.failed_items)} items failed.")
-                    messagebox.showwarning("Done with Errors",
-                        f"Capture completed with {len(self.failed_items)} failures.\nClick 'Retry Failed' to try again.")
+                    def show_warning():
+                        messagebox.showwarning("Done with Errors",
+                            f"Capture completed with {len(self.failed_items)} failures.\nClick 'Retry Failed' to try again.")
+                    self.root.after(0, show_warning)
                 else:
                     self.log("Capture process finished.")
-                    messagebox.showinfo("Done", "Capture completed successfully.")
+                    def show_success():
+                        messagebox.showinfo("Done", "Capture completed successfully.")
+                    self.root.after(0, show_success)
 
         except Exception as e:
             self.log(f"Fatal error: {e}")
 
         finally:
-            if self.driver:
+            # Only close browser if it was created during capture (not opened for login)
+            if self.driver is not None and not self.browser_opened_for_login:
                 try:
                     self.driver.quit()
-                except:
+                    self.driver = None
+                    self.log("Browser closed")
+                except Exception:
                     pass
             self.root.after(0, self._reset_ui)
 
@@ -671,6 +770,8 @@ class AutoCaptureTool:
         else:
             self.retry_btn.config(state=tk.DISABLED)
         self.is_running = False
+        # Note: browser is kept open if it was opened for login
+        # User can close it manually or start a new capture
 
     # ==================================================
     #        FULL PAGE SCREENSHOT CAPTURE
@@ -720,7 +821,7 @@ class AutoCaptureTool:
 
         else:
             img = Image.open(io.BytesIO(screenshot_bytes))
-            img = self.flatten_rgba(img)
+            img = AutoCaptureTool.flatten_rgba(img)
 
             if fmt == "jpg":
                 img.save(filepath, "JPEG", quality=90)
@@ -780,7 +881,9 @@ class AutoCaptureTool:
                     files_to_zip.append((filepath, rel_path, file_size))
             
             if not files_to_zip:
-                messagebox.showinfo("Zip", "No files found to zip.")
+                def show_no_files():
+                    messagebox.showinfo("Zip", "No files found to zip.")
+                self.root.after(0, show_no_files)
                 self.zip_btn.config(state=tk.NORMAL)
                 return
 
@@ -835,23 +938,27 @@ class AutoCaptureTool:
             final_size_mb = final_size / 1024 / 1024
             self.log(f"Created {os.path.basename(current_zip_path)} ({final_size_mb:.2f} MB)")
 
-            # Show completion message
-            if len(zip_files_created) == 1:
-                messagebox.showinfo("Zip Complete", f"Successfully created zip file:\n{os.path.basename(zip_files_created[0])}\n\nSize: {final_size_mb:.2f} MB")
-            else:
-                total_size = sum(os.path.getsize(f) for f in zip_files_created)
-                total_size_mb = total_size / 1024 / 1024
-                file_list = "\n".join([f"{os.path.basename(f)} ({os.path.getsize(f) / 1024 / 1024:.2f} MB)" for f in zip_files_created])
-                messagebox.showinfo(
-                    "Zip Complete",
-                    f"Created {len(zip_files_created)} zip file(s):\n\n{file_list}\n\nTotal size: {total_size_mb:.2f} MB"
-                )
+            # Show completion message (must be called from main thread)
+            def show_completion():
+                if len(zip_files_created) == 1:
+                    messagebox.showinfo("Zip Complete", f"Successfully created zip file:\n{os.path.basename(zip_files_created[0])}\n\nSize: {final_size_mb:.2f} MB")
+                else:
+                    total_size = sum(os.path.getsize(f) for f in zip_files_created)
+                    total_size_mb = total_size / 1024 / 1024
+                    file_list = "\n".join([f"{os.path.basename(f)} ({os.path.getsize(f) / 1024 / 1024:.2f} MB)" for f in zip_files_created])
+                    messagebox.showinfo(
+                        "Zip Complete",
+                        f"Created {len(zip_files_created)} zip file(s):\n\n{file_list}\n\nTotal size: {total_size_mb:.2f} MB"
+                    )
+            self.root.after(0, show_completion)
             
             self.log(f"Zip creation complete! Created {len(zip_files_created)} file(s).")
 
         except Exception as e:
             self.log(f"Error creating zip: {e}")
-            messagebox.showerror("Error", f"Failed to create zip file:\n{e}")
+            def show_error():
+                messagebox.showerror("Error", f"Failed to create zip file:\n{e}")
+            self.root.after(0, show_error)
         finally:
             self.zip_btn.config(state=tk.NORMAL)
 
