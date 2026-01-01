@@ -195,6 +195,18 @@ class AutoCaptureTool:
             activebackground=DarkTheme.BG_PANEL
         )
         chk_persist.pack(anchor="w")
+        
+        self.headless_var = tk.BooleanVar(value=False)
+        chk_headless = tk.Checkbutton(
+            opt_frame,
+            text="Run headless (no browser window)",
+            variable=self.headless_var,
+            bg=DarkTheme.BG_PANEL,
+            fg=DarkTheme.FG_TEXT,
+            selectcolor=DarkTheme.BG_INPUT,
+            activebackground=DarkTheme.BG_PANEL
+        )
+        chk_headless.pack(anchor="w")
 
         # ---------- FORMAT + SETTINGS ----------
         settings_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=10)
@@ -364,13 +376,27 @@ class AutoCaptureTool:
     #                       LOGGING
     # ==================================================
     def log(self, message: str):
+        """Thread-safe logging method."""
         timestamp = datetime.now().strftime("[%H:%M:%S]")
-        self.log_box.insert(tk.END, f"{timestamp} {message}\n")
+        self.root.after(0, self._log_to_ui, f"{timestamp} {message}\n")
+    
+    def _log_to_ui(self, message: str):
+        """Internal method - runs on main thread."""
+        self.log_box.insert(tk.END, message)
         self.log_box.see(tk.END)
 
     # ==================================================
     #           DYNAMIC URL CLEANING / EXTRACTION
     # ==================================================
+    @staticmethod
+    def validate_url(url: str) -> bool:
+        """Validate if a URL is properly formatted."""
+        try:
+            result = urlparse(url)
+            return all([result.scheme in ('http', 'https'), result.netloc])
+        except:
+            return False
+    
     @staticmethod
     def extract_urls(raw_text: str):
         pattern = r'https?://[^\s<>"\'`]+'
@@ -390,6 +416,9 @@ class AutoCaptureTool:
         
         for url in results:
             clean = url.rstrip(".,;:)")
+            # Validate URL before adding
+            if not AutoCaptureTool.validate_url(clean):
+                continue
             normalized = normalize_url_for_comparison(clean)
             
             if normalized not in seen:
@@ -528,6 +557,11 @@ class AutoCaptureTool:
     def stop_capture(self):
         self.is_running = False
         self.log("Stopping capture...")
+        if self.driver:
+            try:
+                self.driver.execute_script("window.stop();")  # Stop page loading
+            except:
+                pass
 
     def retry_failed(self):
         """Retry all failed captures."""
@@ -594,7 +628,10 @@ class AutoCaptureTool:
             # Initialize browser if not already open
             if self.driver is None:
                 options = Options()
-                # options.add_argument("--headless")  # Uncomment for invisible browser
+                
+                # Add headless mode if enabled
+                if self.headless_var.get():
+                    options.add_argument("--headless=new")
                 
                 # Use persistent profile if enabled
                 if self.persist_session_var.get():
@@ -614,14 +651,20 @@ class AutoCaptureTool:
                         options=options
                     )
                     new_driver.set_window_size(width, 900)
+                    # Set page load timeout
+                    new_driver.set_page_load_timeout(60)
                     return new_driver
 
                 self.driver = init_driver()
             else:
                 # Browser already open (from login), just resize it
                 self.driver.set_window_size(width, 900)
+                self.driver.set_page_load_timeout(60)
                 self.log("Reusing existing browser session")
             total = len(self.items_to_process)
+            
+            # Maximum retries for failed captures
+            MAX_RETRIES = 2
 
             for i, item in enumerate(self.items_to_process):
                 if not self.is_running:
@@ -644,11 +687,14 @@ class AutoCaptureTool:
                             options.add_experimental_option("prefs", {
                                 "profile.default_content_setting_values.cookies": 2
                             })
+                        if self.headless_var.get():
+                            options.add_argument("--headless=new")
                         self.driver = webdriver.Chrome(
                             service=Service(ChromeDriverManager().install()),
                             options=options
                         )
                         self.driver.set_window_size(width, 900)
+                        self.driver.set_page_load_timeout(60)
                         self.browser_opened_for_login = False  # Reset flag since we're recreating
                         self.log("Browser restarted successfully")
                     except Exception as re_init_err:
@@ -659,72 +705,102 @@ class AutoCaptureTool:
                 self._update_progress(f"Loading {url}", i)
                 self.log(f"Loading {url}")
 
-                try:
-                    self.driver.get(url)
+                # Retry logic for failed captures
+                capture_success = False
+                last_error = None
+                for attempt in range(MAX_RETRIES + 1):
+                    if not self.is_running:
+                        break
                     
-                    # Wait for page to load (wait for document.readyState)
                     try:
-                        WebDriverWait(self.driver, delay + 5).until(
-                            lambda d: d.execute_script('return document.readyState') == 'complete'
-                        )
-                    except TimeoutException:
-                        self.log(f"Warning: Page load timeout for {url}, proceeding anyway...")
-                    
-                    # Additional wait for dynamic content
-                    time.sleep(1)
-                    
-                    # Check if we're stuck on a login page
-                    current_url = self.driver.current_url.lower()
-                    original_url_lower = url.lower()
-                    page_title = self.driver.title.lower()
-                    page_source = self.driver.page_source.lower()[:10000]  # Sample first 10k chars for performance
-                    
-                    # Common login page indicators (only check if URL changed significantly)
-                    is_login_page = False
-                    if current_url != original_url_lower:
-                        login_indicators = [
-                            '/login' in current_url or '/signin' in current_url or '/auth' in current_url,
-                            'sign in' in page_title or 'log in' in page_title,
-                            'authentication required' in page_title,
-                            (('password' in page_source and 'email' in page_source) or 
-                             ('password' in page_source and 'username' in page_source)) and len(page_source) < 30000
-                        ]
-                        is_login_page = any(login_indicators)
-                    
-                    if is_login_page:
-                        if self.skip_login_var.get():
-                            self.log(f"SKIPPED: Detected login page for {url}")
-                            self.log(f"Current URL: {self.driver.current_url}")
-                            self.failed_items.append(item)
-                            continue  # Skip this URL
+                        self.driver.get(url)
+                        
+                        # Wait for page to load (wait for document.readyState)
+                        try:
+                            WebDriverWait(self.driver, delay + 5).until(
+                                lambda d: d.execute_script('return document.readyState') == 'complete'
+                            )
+                        except TimeoutException:
+                            if attempt < MAX_RETRIES:
+                                self.log(f"Retry {attempt + 1}/{MAX_RETRIES} for {url} (page load timeout)")
+                                time.sleep(2)
+                                continue
+                            else:
+                                self.log(f"Warning: Page load timeout for {url}, proceeding anyway...")
+                        
+                        # Additional wait for dynamic content
+                        time.sleep(1)
+                        
+                        # Check if we're stuck on a login page
+                        current_url = self.driver.current_url.lower()
+                        original_url_lower = url.lower()
+                        page_title = self.driver.title.lower()
+                        page_source = self.driver.page_source.lower()[:10000]  # Sample first 10k chars for performance
+                        
+                        # Common login page indicators (only check if URL changed significantly)
+                        is_login_page = False
+                        if current_url != original_url_lower:
+                            login_indicators = [
+                                '/login' in current_url or '/signin' in current_url or '/auth' in current_url,
+                                'sign in' in page_title or 'log in' in page_title,
+                                'authentication required' in page_title,
+                                (('password' in page_source and 'email' in page_source) or 
+                                 ('password' in page_source and 'username' in page_source)) and len(page_source) < 30000
+                            ]
+                            is_login_page = any(login_indicators)
+                        
+                        if is_login_page:
+                            if self.skip_login_var.get():
+                                self.log(f"SKIPPED: Detected login page for {url}")
+                                self.log(f"Current URL: {self.driver.current_url}")
+                                self.failed_items.append(item)
+                                capture_success = False
+                                break
+                            else:
+                                self.log(f"WARNING: Appears to be on login page (current: {self.driver.current_url})")
+                                self.log(f"Original URL: {url}")
+                                self.log("Browser is visible - you can manually login if needed")
+                                # Give user time to interact if browser is visible
+                                time.sleep(3)
+
+                        # Only clear cookies if NOT using persistent profile (would break login sessions)
+                        if not self.persist_session_var.get():
+                            self.driver.delete_all_cookies()
+
+                        self._update_progress("Capturing...", i)
+                        screenshot = self._capture_full_page()
+
+                        self._save_file(item, screenshot)
+                        self.log(f"Saved {item['filename']}")
+                        capture_success = True
+                        break
+                        
+                    except TimeoutException as e:
+                        last_error = e
+                        if attempt < MAX_RETRIES:
+                            self.log(f"Retry {attempt + 1}/{MAX_RETRIES} for {url} (timeout)")
+                            time.sleep(2)
                         else:
-                            self.log(f"WARNING: Appears to be on login page (current: {self.driver.current_url})")
-                            self.log(f"Original URL: {url}")
-                            self.log("Browser is visible - you can manually login if needed")
-                            # Give user time to interact if browser is visible
-                            time.sleep(3)
-
-                    # Only clear cookies if NOT using persistent profile (would break login sessions)
-                    if not self.persist_session_var.get():
-                        self.driver.delete_all_cookies()
-
-                    self._update_progress("Capturing...", i)
-                    screenshot = self._capture_full_page()
-
-                    self._save_file(item, screenshot)
-                    self.log(f"Saved {item['filename']}")
-
-                except Exception as e:
-                    self.log(f"Error on {url}: {e}")
-                    # Track failed items for retry
-                    self.failed_items.append(item)
-
-                    # If it's a connection refused error, your local server likely isn't running
-                    if "net::ERR_CONNECTION_REFUSED" in str(e):
-                        self.log("CRITICAL: Local server not detected on port 3000.")
-                    time.sleep(1)
+                            self.log(f"Failed after {MAX_RETRIES + 1} attempts: {url} - {e}")
+                            self.failed_items.append(item)
+                    except Exception as e:
+                        last_error = e
+                        if attempt < MAX_RETRIES:
+                            self.log(f"Retry {attempt + 1}/{MAX_RETRIES} for {url} (error: {str(e)[:50]})")
+                            time.sleep(2)
+                        else:
+                            self.log(f"Error on {url} after {MAX_RETRIES + 1} attempts: {e}")
+                            self.failed_items.append(item)
+                            # If it's a connection refused error, your local server likely isn't running
+                            if "net::ERR_CONNECTION_REFUSED" in str(e):
+                                self.log("CRITICAL: Local server not detected on port 3000.")
+                
+                if not capture_success:
+                    continue
 
             if self.is_running:
+                # Update progress bar to 100% on completion
+                self._update_progress("Complete", len(self.items_to_process))
                 if self.failed_items:
                     self.log(f"Capture process finished. {len(self.failed_items)} items failed.")
                     def show_warning():
@@ -755,6 +831,11 @@ class AutoCaptureTool:
     #              UPDATE PROGRESS BAR
     # ==================================================
     def _update_progress(self, msg, value):
+        """Thread-safe progress update."""
+        self.root.after(0, self._do_update_progress, msg, value)
+    
+    def _do_update_progress(self, msg, value):
+        """Internal method - runs on main thread."""
         self.progress_var.set(msg)
         self.progress_bar["value"] = value
 
@@ -808,11 +889,24 @@ class AutoCaptureTool:
     # ==================================================
     #                  SAVE FILES
     # ==================================================
+    def _get_unique_filepath(self, folder: str, filename: str) -> str:
+        """Get a unique filepath, appending counter if file exists."""
+        filepath = os.path.join(folder, filename)
+        if not os.path.exists(filepath):
+            return filepath
+        
+        base, ext = os.path.splitext(filename)
+        counter = 1
+        while os.path.exists(filepath):
+            filepath = os.path.join(folder, f"{base}_{counter}{ext}")
+            counter += 1
+        return filepath
+    
     def _save_file(self, item, screenshot_bytes):
         folder = os.path.join(self.root_save_directory, item["subdir"]) if item["subdir"] else self.root_save_directory
         os.makedirs(folder, exist_ok=True)
 
-        filepath = os.path.join(folder, item["filename"])
+        filepath = self._get_unique_filepath(folder, item["filename"])
         fmt = self.format_var.get()
 
         if fmt == "png":

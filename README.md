@@ -52,7 +52,7 @@ If you prefer to set up manually:
 
 ```powershell
 # Navigate to project directory
-cd C:\Users\james\auto_capture_tool
+cd path\to\auto_capture_tool
 
 # Create virtual environment
 python -m venv venv
