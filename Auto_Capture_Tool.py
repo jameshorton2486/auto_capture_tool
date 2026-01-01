@@ -955,6 +955,7 @@ class AutoCaptureTool:
         """Create zip file(s) from all files in save directory. Splits if > 29MB."""
         MAX_ZIP_SIZE = 29 * 1024 * 1024  # 29 MB in bytes
         
+        current_zip = None  # Track current zip file for cleanup in finally block
         try:
             self.log("Starting zip creation...")
             self.zip_btn.config(state=tk.DISABLED)
@@ -1054,7 +1055,16 @@ class AutoCaptureTool:
                 messagebox.showerror("Error", f"Failed to create zip file:\n{e}")
             self.root.after(0, show_error)
         finally:
-            self.zip_btn.config(state=tk.NORMAL)
+            # Ensure zip file is closed even if an exception occurred
+            if current_zip is not None:
+                try:
+                    current_zip.close()
+                except Exception:
+                    pass  # Ignore errors when closing in cleanup
+            # Re-enable button on main thread (thread-safe GUI modification)
+            def enable_button():
+                self.zip_btn.config(state=tk.NORMAL)
+            self.root.after(0, enable_button)
 
 
 # ======================================================
