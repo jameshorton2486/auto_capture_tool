@@ -544,6 +544,9 @@ class AutoCaptureTool:
             duplicates = len(urls) - len(self.items_to_process)
             self.log(f"Removed {duplicates} duplicate URL(s) after normalization")
 
+        # Clear failed items from previous capture runs
+        self.failed_items = []
+
         self.is_running = True
         self.stop_btn.config(state=tk.NORMAL)
         self.start_btn.config(state=tk.DISABLED)
@@ -637,12 +640,8 @@ class AutoCaptureTool:
                 if self.persist_session_var.get():
                     options.add_argument(f"--user-data-dir={self.chrome_user_data_dir}")
                     self.log("Using persistent Chrome profile")
-                else:
-                    options.add_argument("--disable-cache")
-                    options.add_argument("--disk-cache-size=0")
-                    options.add_experimental_option("prefs", {
-                        "profile.default_content_setting_values.cookies": 2  # Block cookies
-                    })
+                # Note: Cookies are allowed during the session to maintain login state between pages
+                # If you want to clear cookies between runs, close and reopen the browser
 
                 def init_driver():
                     self.log("Initializing browser...")
@@ -681,12 +680,7 @@ class AutoCaptureTool:
                         options = Options()
                         if self.persist_session_var.get():
                             options.add_argument(f"--user-data-dir={self.chrome_user_data_dir}")
-                        else:
-                            options.add_argument("--disable-cache")
-                            options.add_argument("--disk-cache-size=0")
-                            options.add_experimental_option("prefs", {
-                                "profile.default_content_setting_values.cookies": 2
-                            })
+                        # Note: Cookies are allowed during the session to maintain login state
                         if self.headless_var.get():
                             options.add_argument("--headless=new")
                         self.driver = webdriver.Chrome(
@@ -763,9 +757,8 @@ class AutoCaptureTool:
                                 # Give user time to interact if browser is visible
                                 time.sleep(3)
 
-                        # Only clear cookies if NOT using persistent profile (would break login sessions)
-                        if not self.persist_session_var.get():
-                            self.driver.delete_all_cookies()
+                        # Cookies are preserved between pages to maintain login sessions
+                        # This allows capturing multiple pages from the same site without re-authenticating
 
                         self._update_progress("Capturing...", i)
                         screenshot = self._capture_full_page()
