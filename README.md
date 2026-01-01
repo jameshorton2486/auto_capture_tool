@@ -4,7 +4,7 @@ Automated screenshot capture tool for web pages with full-page scrolling support
 
 ## Prerequisites
 
-- Python 3.11 or higher
+- Python 3.13.0 (tested with this version; may work with 3.11+)
 - Google Chrome browser installed
 
 ## Quick Start
@@ -153,7 +153,7 @@ The launcher scripts (`run_app.bat` or `run_app.ps1`) automatically detect and s
 
 ### Python Command Not Found
 
-Make sure Python 3.11 or higher is installed and in your PATH. You can check by running:
+Make sure Python 3.13.0 (or 3.11+) is installed and in your PATH. You can check by running:
 ```powershell
 python --version
 ```
