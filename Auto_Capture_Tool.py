@@ -669,31 +669,37 @@ class AutoCaptureTool:
                 if not self.is_running:
                     break
 
-                # CHECK IF BROWSER IS STILL OPEN
+                # CHECK IF BROWSER IS STILL OPEN (only restart if actually closed)
                 try:
-                    # Accessing window_handles is a quick way to see if the driver is alive
-                    _ = self.driver.window_handles
-                except Exception:
-                    self.log("Browser was closed. Attempting to restart...")
-                    try:
-                        # Recreate browser with same options
-                        options = Options()
-                        if self.persist_session_var.get():
-                            options.add_argument(f"--user-data-dir={self.chrome_user_data_dir}")
-                        # Note: Cookies are allowed during the session to maintain login state
-                        if self.headless_var.get():
-                            options.add_argument("--headless=new")
-                        self.driver = webdriver.Chrome(
-                            service=Service(ChromeDriverManager().install()),
-                            options=options
-                        )
-                        self.driver.set_window_size(width, 900)
-                        self.driver.set_page_load_timeout(60)
-                        self.browser_opened_for_login = False  # Reset flag since we're recreating
-                        self.log("Browser restarted successfully")
-                    except Exception as re_init_err:
-                        self.log(f"Failed to restart browser: {re_init_err}")
-                        break
+                    # Try a more robust check - get current URL which requires active browser
+                    _ = self.driver.current_url
+                except (Exception, AttributeError) as browser_check_err:
+                    # Only restart on specific exceptions that indicate browser is actually closed
+                    error_str = str(browser_check_err).lower()
+                    if any(keyword in error_str for keyword in ['invalid session id', 'no such window', 'session deleted', 'target frame detached']):
+                        self.log("Browser was closed. Attempting to restart...")
+                        try:
+                            # Recreate browser with same options
+                            options = Options()
+                            if self.persist_session_var.get():
+                                options.add_argument(f"--user-data-dir={self.chrome_user_data_dir}")
+                            # Note: Cookies are allowed during the session to maintain login state
+                            if self.headless_var.get():
+                                options.add_argument("--headless=new")
+                            self.driver = webdriver.Chrome(
+                                service=Service(ChromeDriverManager().install()),
+                                options=options
+                            )
+                            self.driver.set_window_size(width, 900)
+                            self.driver.set_page_load_timeout(60)
+                            self.browser_opened_for_login = False  # Reset flag since we're recreating
+                            self.log("Browser restarted successfully")
+                        except Exception as re_init_err:
+                            self.log(f"Failed to restart browser: {re_init_err}")
+                            break
+                    else:
+                        # Browser is still alive, just had a temporary issue - log and continue
+                        self.log(f"Browser check warning (continuing): {browser_check_err}")
 
                 url = item["url"]
                 self._update_progress(f"Loading {url}", i)
@@ -755,7 +761,21 @@ class AutoCaptureTool:
                                 self.log(f"Original URL: {url}")
                                 self.log("Browser is visible - you can manually login if needed")
                                 # Give user time to interact if browser is visible
-                                time.sleep(3)
+                                # Wait longer and check if user logged in
+                                login_page_url = current_url  # Store the login page URL
+                                for wait_attempt in range(6):  # Wait up to 30 seconds (6 * 5)
+                                    time.sleep(5)
+                                    try:
+                                        # Check if we're still on a login page
+                                        current_url_after_wait = self.driver.current_url.lower()
+                                        # If URL changed away from login page, assume user logged in
+                                        if current_url_after_wait != login_page_url and '/login' not in current_url_after_wait and '/signin' not in current_url_after_wait:
+                                            self.log("Detected navigation away from login page - assuming login successful")
+                                            break
+                                    except Exception:
+                                        # If we can't check, continue anyway
+                                        break
+                                self.log("Continuing with capture...")
 
                         # Cookies are preserved between pages to maintain login sessions
                         # This allows capturing multiple pages from the same site without re-authenticating
