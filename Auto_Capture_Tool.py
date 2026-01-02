@@ -667,43 +667,67 @@ class AutoCaptureTool:
 
             for i, item in enumerate(self.items_to_process):
                 if not self.is_running:
+                    self.log("Capture stopped by user")
                     break
 
+                # Log progress
+                progress_msg = f"[{i+1}/{total}] Processing: {item['url']}"
+                self.log(progress_msg)
+                self._update_progress(f"[{i+1}/{total}] {item['url']}", i)
+
                 # CHECK IF BROWSER IS STILL OPEN (only restart if actually closed)
-                try:
-                    # Try a more robust check - get current URL which requires active browser
-                    _ = self.driver.current_url
-                except (Exception, AttributeError) as browser_check_err:
-                    # Only restart on specific exceptions that indicate browser is actually closed
-                    error_str = str(browser_check_err).lower()
-                    if any(keyword in error_str for keyword in ['invalid session id', 'no such window', 'session deleted', 'target frame detached']):
-                        self.log("Browser was closed. Attempting to restart...")
-                        try:
-                            # Recreate browser with same options
-                            options = Options()
-                            if self.persist_session_var.get():
-                                options.add_argument(f"--user-data-dir={self.chrome_user_data_dir}")
-                            # Note: Cookies are allowed during the session to maintain login state
-                            if self.headless_var.get():
-                                options.add_argument("--headless=new")
-                            self.driver = webdriver.Chrome(
-                                service=Service(ChromeDriverManager().install()),
-                                options=options
-                            )
-                            self.driver.set_window_size(width, 900)
-                            self.driver.set_page_load_timeout(60)
-                            self.browser_opened_for_login = False  # Reset flag since we're recreating
-                            self.log("Browser restarted successfully")
-                        except Exception as re_init_err:
-                            self.log(f"Failed to restart browser: {re_init_err}")
-                            break
-                    else:
-                        # Browser is still alive, just had a temporary issue - log and continue
-                        self.log(f"Browser check warning (continuing): {browser_check_err}")
+                if self.driver is None:
+                    self.log("Browser is None - initializing...")
+                    try:
+                        options = Options()
+                        if self.persist_session_var.get():
+                            options.add_argument(f"--user-data-dir={self.chrome_user_data_dir}")
+                        if self.headless_var.get():
+                            options.add_argument("--headless=new")
+                        self.driver = webdriver.Chrome(
+                            service=Service(ChromeDriverManager().install()),
+                            options=options
+                        )
+                        self.driver.set_window_size(width, 900)
+                        self.driver.set_page_load_timeout(60)
+                        self.log("Browser initialized successfully")
+                    except Exception as init_err:
+                        self.log(f"Failed to initialize browser: {init_err}")
+                        self.failed_items.append(item)
+                        continue
+                else:
+                    # Only check browser health if driver exists - don't restart unnecessarily
+                    try:
+                        # Quick check - try to get window handles (lightweight operation)
+                        _ = self.driver.window_handles
+                    except Exception as browser_check_err:
+                        # Only restart on specific exceptions that indicate browser is actually closed
+                        error_str = str(browser_check_err).lower()
+                        if any(keyword in error_str for keyword in ['invalid session id', 'no such window', 'session deleted', 'target frame detached']):
+                            self.log("Browser was closed. Attempting to restart...")
+                            try:
+                                # Recreate browser with same options
+                                options = Options()
+                                if self.persist_session_var.get():
+                                    options.add_argument(f"--user-data-dir={self.chrome_user_data_dir}")
+                                # Note: Cookies are allowed during the session to maintain login state
+                                if self.headless_var.get():
+                                    options.add_argument("--headless=new")
+                                self.driver = webdriver.Chrome(
+                                    service=Service(ChromeDriverManager().install()),
+                                    options=options
+                                )
+                                self.driver.set_window_size(width, 900)
+                                self.driver.set_page_load_timeout(60)
+                                self.browser_opened_for_login = False  # Reset flag since we're recreating
+                                self.log("Browser restarted successfully")
+                            except Exception as re_init_err:
+                                self.log(f"Failed to restart browser: {re_init_err}")
+                                self.failed_items.append(item)
+                                continue
+                        # If it's not a fatal error, continue - browser might still work
 
                 url = item["url"]
-                self._update_progress(f"Loading {url}", i)
-                self.log(f"Loading {url}")
 
                 # Retry logic for failed captures
                 capture_success = False
@@ -809,21 +833,30 @@ class AutoCaptureTool:
                                 self.log("CRITICAL: Local server not detected on port 3000.")
                 
                 if not capture_success:
+                    self.log(f"Failed to capture {url} - continuing to next URL")
                     continue
+                else:
+                    self.log(f"✓ Successfully captured [{i+1}/{total}]: {url}")
 
             if self.is_running:
+                self.log(f"Finished processing all {total} URLs")
                 # Update progress bar to 100% on completion
                 self._update_progress("Complete", len(self.items_to_process))
+                
+                # Calculate success count
+                success_count = total - len(self.failed_items)
+                self.log(f"Summary: {success_count} succeeded, {len(self.failed_items)} failed out of {total} total")
+                
                 if self.failed_items:
-                    self.log(f"Capture process finished. {len(self.failed_items)} items failed.")
+                    self.log(f"Failed URLs: {[item['url'] for item in self.failed_items]}")
                     def show_warning():
                         messagebox.showwarning("Done with Errors",
-                            f"Capture completed with {len(self.failed_items)} failures.\nClick 'Retry Failed' to try again.")
+                            f"Capture completed:\n{success_count} succeeded\n{len(self.failed_items)} failed\n\nClick 'Retry Failed' to retry the failed URLs.")
                     self.root.after(0, show_warning)
                 else:
-                    self.log("Capture process finished.")
+                    self.log("Capture process finished successfully - all URLs captured!")
                     def show_success():
-                        messagebox.showinfo("Done", "Capture completed successfully.")
+                        messagebox.showinfo("Done", f"Capture completed successfully!\n\nAll {total} URLs captured.")
                     self.root.after(0, show_success)
 
         except Exception as e:
