@@ -175,7 +175,7 @@ class AutoCaptureTool:
         self.skip_login_var = tk.BooleanVar(value=False)
         chk_skip = tk.Checkbutton(
             opt_frame,
-            text="Skip login pages (skip if detected on login/auth page)",
+            text="Skip login pages (NOT recommended - will skip pages that require login)",
             variable=self.skip_login_var,
             bg=DarkTheme.BG_PANEL,
             fg=DarkTheme.FG_TEXT,
@@ -184,10 +184,10 @@ class AutoCaptureTool:
         )
         chk_skip.pack(anchor="w")
         
-        self.persist_session_var = tk.BooleanVar(value=False)
+        self.persist_session_var = tk.BooleanVar(value=True)  # Enabled by default for easier login handling
         chk_persist = tk.Checkbutton(
             opt_frame,
-            text="Keep login sessions (save Chrome profile between runs)",
+            text="Keep login sessions (save Chrome profile between runs) - RECOMMENDED",
             variable=self.persist_session_var,
             bg=DarkTheme.BG_PANEL,
             fg=DarkTheme.FG_TEXT,
@@ -598,10 +598,14 @@ class AutoCaptureTool:
         width = int(self.width_var.get())
         options = Options()
         
-        # Use persistent profile if enabled
+        # Always use persistent profile for login sessions (recommended)
         if self.persist_session_var.get():
             options.add_argument(f"--user-data-dir={self.chrome_user_data_dir}")
             self.log("Using persistent Chrome profile for login sessions")
+        else:
+            # Even if not checked, still use profile for this session
+            options.add_argument(f"--user-data-dir={self.chrome_user_data_dir}")
+            self.log("Using Chrome profile for this session (login will persist during capture)")
         
         try:
             self.log("Opening browser for manual login...")
@@ -611,11 +615,29 @@ class AutoCaptureTool:
             )
             self.driver.set_window_size(width, 900)
             self.browser_opened_for_login = True
-            self.log("Browser opened. Log in to sites as needed, then click 'Start' to capture.")
-            messagebox.showinfo("Browser Opened", 
-                "Browser is now open. You can log in to websites manually.\n\n"
-                "After logging in, click 'Start' to begin capturing.\n\n"
-                "Make sure 'Keep login sessions' is checked if you want to save your login.")
+            
+            # Try to navigate to first URL or a login page if URLs are provided
+            urls = self.extract_urls(self.text_area.get("1.0", tk.END))
+            if urls:
+                first_url = urls[0]
+                # If first URL looks like a login page, navigate there
+                if '/login' in first_url.lower() or '/signin' in first_url.lower() or '/auth' in first_url.lower():
+                    self.driver.get(first_url)
+                    self.log(f"Navigated to login page: {first_url}")
+                else:
+                    # Navigate to first URL - user can find login from there
+                    self.driver.get(first_url)
+                    self.log(f"Navigated to: {first_url}")
+            else:
+                self.log("No URLs found. Browser opened - navigate to your login page manually.")
+            
+            self.log("Browser opened. Log in to your website, then click 'Start' to capture all pages.")
+            messagebox.showinfo("Browser Opened - Login Required", 
+                "Browser is now open.\n\n"
+                "1. Log in to your website in the browser window\n"
+                "2. Once logged in, click 'Start' to begin capturing\n\n"
+                "Your login session will be preserved for all page captures.\n"
+                "The 'Keep login sessions' option saves your login between app runs.")
         except Exception as e:
             self.log(f"Error opening browser: {e}")
             messagebox.showerror("Error", f"Failed to open browser:\n{e}")
@@ -781,25 +803,54 @@ class AutoCaptureTool:
                                 capture_success = False
                                 break
                             else:
-                                self.log(f"WARNING: Appears to be on login page (current: {self.driver.current_url})")
-                                self.log(f"Original URL: {url}")
-                                self.log("Browser is visible - you can manually login if needed")
-                                # Give user time to interact if browser is visible
-                                # Wait longer and check if user logged in
-                                login_page_url = current_url  # Store the login page URL
-                                for wait_attempt in range(6):  # Wait up to 30 seconds (6 * 5)
-                                    time.sleep(5)
+                                # If browser was opened for login, user should already be logged in
+                                # Try navigating to the original URL again - might have been a redirect
+                                if self.browser_opened_for_login:
+                                    self.log(f"Detected redirect to login page for {url}")
+                                    self.log("Attempting to navigate to original URL (you should already be logged in)...")
                                     try:
-                                        # Check if we're still on a login page
-                                        current_url_after_wait = self.driver.current_url.lower()
-                                        # If URL changed away from login page, assume user logged in
-                                        if current_url_after_wait != login_page_url and '/login' not in current_url_after_wait and '/signin' not in current_url_after_wait:
-                                            self.log("Detected navigation away from login page - assuming login successful")
+                                        time.sleep(2)  # Brief wait
+                                        self.driver.get(url)  # Try original URL again
+                                        time.sleep(2)  # Wait for page load
+                                        # Check if we're still on login page
+                                        new_url = self.driver.current_url.lower()
+                                        if '/login' not in new_url and '/signin' not in new_url and '/auth' not in new_url:
+                                            self.log("Successfully accessed page after re-navigation")
+                                            # Continue with capture
+                                        else:
+                                            self.log("Still on login page - you may need to log in manually")
+                                            # Give user time to login if needed
+                                            for wait_attempt in range(4):  # Wait up to 20 seconds
+                                                time.sleep(5)
+                                                try:
+                                                    check_url = self.driver.current_url.lower()
+                                                    if '/login' not in check_url and '/signin' not in check_url:
+                                                        self.log("Detected navigation away from login - continuing")
+                                                        break
+                                                except Exception:
+                                                    break
+                                    except Exception as nav_err:
+                                        self.log(f"Error re-navigating: {nav_err}")
+                                else:
+                                    # Browser wasn't opened for login - user needs to log in
+                                    self.log(f"WARNING: Appears to be on login page (current: {self.driver.current_url})")
+                                    self.log(f"Original URL: {url}")
+                                    self.log("Browser is visible - you can manually login if needed")
+                                    # Give user time to interact if browser is visible
+                                    login_page_url = current_url  # Store the login page URL
+                                    for wait_attempt in range(6):  # Wait up to 30 seconds (6 * 5)
+                                        time.sleep(5)
+                                        try:
+                                            # Check if we're still on a login page
+                                            current_url_after_wait = self.driver.current_url.lower()
+                                            # If URL changed away from login page, assume user logged in
+                                            if current_url_after_wait != login_page_url and '/login' not in current_url_after_wait and '/signin' not in current_url_after_wait:
+                                                self.log("Detected navigation away from login page - assuming login successful")
+                                                break
+                                        except Exception:
+                                            # If we can't check, continue anyway
                                             break
-                                    except Exception:
-                                        # If we can't check, continue anyway
-                                        break
-                                self.log("Continuing with capture...")
+                                    self.log("Continuing with capture...")
 
                         # Cookies are preserved between pages to maintain login sessions
                         # This allows capturing multiple pages from the same site without re-authenticating
