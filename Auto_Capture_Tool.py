@@ -296,6 +296,17 @@ class AutoCaptureTool:
             pady=4
         )
         self.preview_btn.pack(side=tk.LEFT, padx=5)
+        
+        self.clear_log_btn = tk.Button(
+            btn_frame,
+            text="Clear Log",
+            command=self.clear_log,
+            bg=DarkTheme.BG_PANEL,
+            fg=DarkTheme.FG_TEXT,
+            padx=6,
+            pady=4
+        )
+        self.clear_log_btn.pack(side=tk.LEFT, padx=5)
 
         self.start_btn = tk.Button(
             btn_frame,
@@ -354,6 +365,11 @@ class AutoCaptureTool:
         )
         self.login_btn.pack(side=tk.LEFT, padx=5)
 
+        # ---------- KEYBOARD SHORTCUTS ----------
+        self.root.bind('<Control-Return>', lambda e: self.start_capture() if self.start_btn['state'] == tk.NORMAL else None)
+        self.root.bind('<Control-Enter>', lambda e: self.start_capture() if self.start_btn['state'] == tk.NORMAL else None)
+        self.root.bind('<Escape>', lambda e: self.stop_capture() if self.stop_btn['state'] == tk.NORMAL else None)
+        
         # ---------- STATUS BAR ----------
         status_frame = ttk.Frame(self.root, style="Panel.TFrame")
         status_frame.pack(fill=tk.X)
@@ -390,10 +406,24 @@ class AutoCaptureTool:
     # ==================================================
     @staticmethod
     def validate_url(url: str) -> bool:
-        """Validate if a URL is properly formatted."""
+        """Validate if a URL is properly formatted and doesn't contain dynamic parameters."""
         try:
             result = urlparse(url)
-            return all([result.scheme in ('http', 'https'), result.netloc])
+            if not all([result.scheme in ('http', 'https'), result.netloc]):
+                return False
+            
+            # Filter out URLs with dynamic parameters like [id], [jobId], {id}, etc.
+            # These are placeholders that won't work without actual values
+            dynamic_patterns = [
+                r'\[.*?\]',  # [id], [jobId], [invoiceId], etc.
+                r'\{.*?\}',  # {id}, {slug}, etc.
+                r'<.*?>',    # <id>, <slug>, etc.
+            ]
+            for pattern in dynamic_patterns:
+                if re.search(pattern, url):
+                    return False
+            
+            return True
         except:
             return False
     
@@ -411,21 +441,31 @@ class AutoCaptureTool:
             # Convert to lowercase for comparison
             return url.lower()
 
-        unique = []
-        seen = set()
+        filtered_urls = []
+        skipped_dynamic = []
         
         for url in results:
             clean = url.rstrip(".,;:)")
             # Validate URL before adding
             if not AutoCaptureTool.validate_url(clean):
+                # Check if it was skipped due to dynamic parameters
+                if re.search(r'\[.*?\]|\{.*?\}|<.*?>', clean):
+                    skipped_dynamic.append(clean)
                 continue
-            normalized = normalize_url_for_comparison(clean)
+            filtered_urls.append(clean)
+        
+        unique = []
+        seen = set()
+        
+        for url in filtered_urls:
+            normalized = normalize_url_for_comparison(url)
             
             if normalized not in seen:
                 seen.add(normalized)
-                unique.append(clean)
+                unique.append(url)  # Fixed: use url, not clean
 
-        return unique
+        # Return tuple: (unique_urls, skipped_dynamic_urls)
+        return unique, skipped_dynamic
 
     # ==================================================
     #            FILEPATH BUILDER (STATIC METHOD)
@@ -470,7 +510,9 @@ class AutoCaptureTool:
     # ==================================================
     def preview_urls(self):
         try:
-            urls = self.extract_urls(self.text_area.get("1.0", tk.END))
+            urls, skipped = self.extract_urls(self.text_area.get("1.0", tk.END))
+            if skipped:
+                self.log(f"Note: {len(skipped)} URL(s) with dynamic parameters were skipped (e.g., [id], [jobId])")
             if not urls:
                 messagebox.showinfo("Preview", "No URLs detected.")
                 return
@@ -505,6 +547,14 @@ class AutoCaptureTool:
             self.entry_dir.insert(0, folder)
 
     # ==================================================
+    #                 UTILITY METHODS
+    # ==================================================
+    def clear_log(self):
+        """Clear the log output area."""
+        self.log_box.delete("1.0", tk.END)
+        self.log("Log cleared.")
+    
+    # ==================================================
     #                 CAPTURE THREAD
     # ==================================================
     def start_capture(self):
@@ -516,9 +566,12 @@ class AutoCaptureTool:
         os.makedirs(folder, exist_ok=True)
         self.root_save_directory = folder
 
-        urls = self.extract_urls(self.text_area.get("1.0", tk.END))
+        urls, skipped = self.extract_urls(self.text_area.get("1.0", tk.END))
+        if skipped:
+            self.log(f"Note: {len(skipped)} URL(s) with dynamic parameters skipped (e.g., [id], [jobId])")
+            self.log("These URLs need actual values instead of placeholders to work.")
         if not urls:
-            messagebox.showerror("Error", "No URLs found.")
+            messagebox.showerror("Error", "No valid URLs found.")
             return
 
         # Additional deduplication check (in case extract_urls missed edge cases)
@@ -617,7 +670,9 @@ class AutoCaptureTool:
             self.browser_opened_for_login = True
             
             # Try to navigate to first URL or a login page if URLs are provided
-            urls = self.extract_urls(self.text_area.get("1.0", tk.END))
+            urls, skipped = self.extract_urls(self.text_area.get("1.0", tk.END))
+            if skipped:
+                self.log(f"Note: {len(skipped)} URL(s) with dynamic parameters skipped")
             if urls:
                 first_url = urls[0]
                 # If first URL looks like a login page, navigate there
@@ -891,8 +946,8 @@ class AutoCaptureTool:
 
             if self.is_running:
                 self.log(f"Finished processing all {total} URLs")
-                # Update progress bar to 100% on completion
-                self._update_progress("Complete", len(self.items_to_process))
+                # Update progress bar to 100% on completion (use total, not len to ensure it reaches max)
+                self._update_progress("Complete", total)
                 
                 # Calculate success count
                 success_count = total - len(self.failed_items)
