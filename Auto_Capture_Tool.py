@@ -6,6 +6,8 @@ import time
 import base64
 from datetime import datetime
 from urllib.parse import urlparse
+import urllib.request
+import urllib.error
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -58,6 +60,9 @@ class AutoCaptureTool:
         self.root_save_directory = ""
         self.is_running = False
         self.browser_opened_for_login = False  # Track if browser was opened manually
+        self.user_logged_in = False  # Track if user has logged in during this session
+        self.login_prompt_shown = False  # Only show login prompt once per capture session
+        self.consecutive_connection_errors = 0  # Track connection refused errors
         
         # Chrome profile directory for persistent sessions
         profile_dir = os.path.join(os.path.expanduser("~"), ".auto_capture_tool")
@@ -175,7 +180,7 @@ class AutoCaptureTool:
         self.skip_login_var = tk.BooleanVar(value=False)
         chk_skip = tk.Checkbutton(
             opt_frame,
-            text="Skip login pages (NOT recommended - will skip pages that require login)",
+            text="Skip login pages (skip if detected on login/auth page)",
             variable=self.skip_login_var,
             bg=DarkTheme.BG_PANEL,
             fg=DarkTheme.FG_TEXT,
@@ -184,10 +189,10 @@ class AutoCaptureTool:
         )
         chk_skip.pack(anchor="w")
         
-        self.persist_session_var = tk.BooleanVar(value=True)  # Enabled by default for easier login handling
+        self.persist_session_var = tk.BooleanVar(value=False)
         chk_persist = tk.Checkbutton(
             opt_frame,
-            text="Keep login sessions (save Chrome profile between runs) - RECOMMENDED",
+            text="Keep login sessions (save Chrome profile between runs)",
             variable=self.persist_session_var,
             bg=DarkTheme.BG_PANEL,
             fg=DarkTheme.FG_TEXT,
@@ -296,17 +301,6 @@ class AutoCaptureTool:
             pady=4
         )
         self.preview_btn.pack(side=tk.LEFT, padx=5)
-        
-        self.clear_log_btn = tk.Button(
-            btn_frame,
-            text="Clear Log",
-            command=self.clear_log,
-            bg=DarkTheme.BG_PANEL,
-            fg=DarkTheme.FG_TEXT,
-            padx=6,
-            pady=4
-        )
-        self.clear_log_btn.pack(side=tk.LEFT, padx=5)
 
         self.start_btn = tk.Button(
             btn_frame,
@@ -365,11 +359,6 @@ class AutoCaptureTool:
         )
         self.login_btn.pack(side=tk.LEFT, padx=5)
 
-        # ---------- KEYBOARD SHORTCUTS ----------
-        self.root.bind('<Control-Return>', lambda e: self.start_capture() if self.start_btn['state'] == tk.NORMAL else None)
-        self.root.bind('<Control-Enter>', lambda e: self.start_capture() if self.start_btn['state'] == tk.NORMAL else None)
-        self.root.bind('<Escape>', lambda e: self.stop_capture() if self.stop_btn['state'] == tk.NORMAL else None)
-        
         # ---------- STATUS BAR ----------
         status_frame = ttk.Frame(self.root, style="Panel.TFrame")
         status_frame.pack(fill=tk.X)
@@ -406,24 +395,10 @@ class AutoCaptureTool:
     # ==================================================
     @staticmethod
     def validate_url(url: str) -> bool:
-        """Validate if a URL is properly formatted and doesn't contain dynamic parameters."""
+        """Validate if a URL is properly formatted."""
         try:
             result = urlparse(url)
-            if not all([result.scheme in ('http', 'https'), result.netloc]):
-                return False
-            
-            # Filter out URLs with dynamic parameters like [id], [jobId], {id}, etc.
-            # These are placeholders that won't work without actual values
-            dynamic_patterns = [
-                r'\[.*?\]',  # [id], [jobId], [invoiceId], etc.
-                r'\{.*?\}',  # {id}, {slug}, etc.
-                r'<.*?>',    # <id>, <slug>, etc.
-            ]
-            for pattern in dynamic_patterns:
-                if re.search(pattern, url):
-                    return False
-            
-            return True
+            return all([result.scheme in ('http', 'https'), result.netloc])
         except:
             return False
     
@@ -441,31 +416,21 @@ class AutoCaptureTool:
             # Convert to lowercase for comparison
             return url.lower()
 
-        filtered_urls = []
-        skipped_dynamic = []
+        unique = []
+        seen = set()
         
         for url in results:
             clean = url.rstrip(".,;:)")
             # Validate URL before adding
             if not AutoCaptureTool.validate_url(clean):
-                # Check if it was skipped due to dynamic parameters
-                if re.search(r'\[.*?\]|\{.*?\}|<.*?>', clean):
-                    skipped_dynamic.append(clean)
                 continue
-            filtered_urls.append(clean)
-        
-        unique = []
-        seen = set()
-        
-        for url in filtered_urls:
-            normalized = normalize_url_for_comparison(url)
+            normalized = normalize_url_for_comparison(clean)
             
             if normalized not in seen:
                 seen.add(normalized)
-                unique.append(url)  # Fixed: use url, not clean
+                unique.append(clean)
 
-        # Return tuple: (unique_urls, skipped_dynamic_urls)
-        return unique, skipped_dynamic
+        return unique
 
     # ==================================================
     #            FILEPATH BUILDER (STATIC METHOD)
@@ -506,13 +471,31 @@ class AutoCaptureTool:
         return folder, filename
 
     # ==================================================
+    #              SERVER CONNECTIVITY CHECK
+    # ==================================================
+    def check_server_connectivity(self, url: str, timeout: int = 5) -> tuple[bool, str]:
+        """Check if the server is reachable before starting capture.
+        Returns (is_reachable, error_message)
+        """
+        try:
+            parsed = urlparse(url)
+            test_url = f"{parsed.scheme}://{parsed.netloc}"
+            req = urllib.request.Request(test_url, method='HEAD')
+            urllib.request.urlopen(req, timeout=timeout)
+            return True, ""
+        except urllib.error.URLError as e:
+            if "Connection refused" in str(e) or "ERR_CONNECTION_REFUSED" in str(e):
+                return False, f"Server not running at {parsed.netloc}. Start your dev server first (npm run dev)."
+            return False, f"Cannot reach server: {e.reason}"
+        except Exception as e:
+            return False, f"Connection error: {str(e)}"
+
+    # ==================================================
     #                       PREVIEW
     # ==================================================
     def preview_urls(self):
         try:
-            urls, skipped = self.extract_urls(self.text_area.get("1.0", tk.END))
-            if skipped:
-                self.log(f"Note: {len(skipped)} URL(s) with dynamic parameters were skipped (e.g., [id], [jobId])")
+            urls = self.extract_urls(self.text_area.get("1.0", tk.END))
             if not urls:
                 messagebox.showinfo("Preview", "No URLs detected.")
                 return
@@ -547,14 +530,6 @@ class AutoCaptureTool:
             self.entry_dir.insert(0, folder)
 
     # ==================================================
-    #                 UTILITY METHODS
-    # ==================================================
-    def clear_log(self):
-        """Clear the log output area."""
-        self.log_box.delete("1.0", tk.END)
-        self.log("Log cleared.")
-    
-    # ==================================================
     #                 CAPTURE THREAD
     # ==================================================
     def start_capture(self):
@@ -566,12 +541,9 @@ class AutoCaptureTool:
         os.makedirs(folder, exist_ok=True)
         self.root_save_directory = folder
 
-        urls, skipped = self.extract_urls(self.text_area.get("1.0", tk.END))
-        if skipped:
-            self.log(f"Note: {len(skipped)} URL(s) with dynamic parameters skipped (e.g., [id], [jobId])")
-            self.log("These URLs need actual values instead of placeholders to work.")
+        urls = self.extract_urls(self.text_area.get("1.0", tk.END))
         if not urls:
-            messagebox.showerror("Error", "No valid URLs found.")
+            messagebox.showerror("Error", "No URLs found.")
             return
 
         # Additional deduplication check (in case extract_urls missed edge cases)
@@ -597,8 +569,29 @@ class AutoCaptureTool:
             duplicates = len(urls) - len(self.items_to_process)
             self.log(f"Removed {duplicates} duplicate URL(s) after normalization")
 
+        # Check server connectivity before starting (unless browser is already open)
+        if not self.browser_opened_for_login and self.driver is None:
+            first_url = self.items_to_process[0]["url"]
+            self.log(f"Checking server connectivity...")
+            is_reachable, error_msg = self.check_server_connectivity(first_url)
+            if not is_reachable:
+                messagebox.showerror("Server Not Running", 
+                    f"{error_msg}\n\n"
+                    "Make sure your development server is running:\n"
+                    "1. Open a terminal in your project folder\n"
+                    "2. Run: npm run dev\n"
+                    "3. Wait for 'Ready' message\n"
+                    "4. Then click Start again")
+                return
+            self.log("Server is reachable!")
+
         # Clear failed items from previous capture runs
         self.failed_items = []
+        
+        # Reset login tracking for new capture session
+        self.user_logged_in = False
+        self.login_prompt_shown = False
+        self.consecutive_connection_errors = 0
 
         self.is_running = True
         self.stop_btn.config(state=tk.NORMAL)
@@ -651,14 +644,10 @@ class AutoCaptureTool:
         width = int(self.width_var.get())
         options = Options()
         
-        # Always use persistent profile for login sessions (recommended)
+        # Use persistent profile if enabled
         if self.persist_session_var.get():
             options.add_argument(f"--user-data-dir={self.chrome_user_data_dir}")
             self.log("Using persistent Chrome profile for login sessions")
-        else:
-            # Even if not checked, still use profile for this session
-            options.add_argument(f"--user-data-dir={self.chrome_user_data_dir}")
-            self.log("Using Chrome profile for this session (login will persist during capture)")
         
         try:
             self.log("Opening browser for manual login...")
@@ -668,31 +657,11 @@ class AutoCaptureTool:
             )
             self.driver.set_window_size(width, 900)
             self.browser_opened_for_login = True
-            
-            # Try to navigate to first URL or a login page if URLs are provided
-            urls, skipped = self.extract_urls(self.text_area.get("1.0", tk.END))
-            if skipped:
-                self.log(f"Note: {len(skipped)} URL(s) with dynamic parameters skipped")
-            if urls:
-                first_url = urls[0]
-                # If first URL looks like a login page, navigate there
-                if '/login' in first_url.lower() or '/signin' in first_url.lower() or '/auth' in first_url.lower():
-                    self.driver.get(first_url)
-                    self.log(f"Navigated to login page: {first_url}")
-                else:
-                    # Navigate to first URL - user can find login from there
-                    self.driver.get(first_url)
-                    self.log(f"Navigated to: {first_url}")
-            else:
-                self.log("No URLs found. Browser opened - navigate to your login page manually.")
-            
-            self.log("Browser opened. Log in to your website, then click 'Start' to capture all pages.")
-            messagebox.showinfo("Browser Opened - Login Required", 
-                "Browser is now open.\n\n"
-                "1. Log in to your website in the browser window\n"
-                "2. Once logged in, click 'Start' to begin capturing\n\n"
-                "Your login session will be preserved for all page captures.\n"
-                "The 'Keep login sessions' option saves your login between app runs.")
+            self.log("Browser opened. Log in to sites as needed, then click 'Start' to capture.")
+            messagebox.showinfo("Browser Opened", 
+                "Browser is now open. You can log in to websites manually.\n\n"
+                "After logging in, click 'Start' to begin capturing.\n\n"
+                "Make sure 'Keep login sessions' is checked if you want to save your login.")
         except Exception as e:
             self.log(f"Error opening browser: {e}")
             messagebox.showerror("Error", f"Failed to open browser:\n{e}")
@@ -852,60 +821,49 @@ class AutoCaptureTool:
                         
                         if is_login_page:
                             if self.skip_login_var.get():
-                                self.log(f"SKIPPED: Detected login page for {url}")
-                                self.log(f"Current URL: {self.driver.current_url}")
+                                self.log(f"SKIPPED (login required): {url}")
                                 self.failed_items.append(item)
                                 capture_success = False
                                 break
+                            elif self.login_prompt_shown and not self.user_logged_in:
+                                # Already showed login prompt and user didn't log in - skip waiting
+                                self.log(f"⚠ LOGIN REQUIRED: {url} (capturing login page)")
+                                # Capture the login page but mark as needing retry
+                                self.failed_items.append(item)
                             else:
-                                # If browser was opened for login, user should already be logged in
-                                # Try navigating to the original URL again - might have been a redirect
-                                if self.browser_opened_for_login:
-                                    self.log(f"Detected redirect to login page for {url}")
-                                    self.log("Attempting to navigate to original URL (you should already be logged in)...")
-                                    try:
-                                        time.sleep(2)  # Brief wait
-                                        self.driver.get(url)  # Try original URL again
-                                        time.sleep(2)  # Wait for page load
-                                        # Check if we're still on login page
-                                        new_url = self.driver.current_url.lower()
-                                        if '/login' not in new_url and '/signin' not in new_url and '/auth' not in new_url:
-                                            self.log("Successfully accessed page after re-navigation")
-                                            # Continue with capture
-                                        else:
-                                            self.log("Still on login page - you may need to log in manually")
-                                            # Give user time to login if needed
-                                            for wait_attempt in range(4):  # Wait up to 20 seconds
-                                                time.sleep(5)
-                                                try:
-                                                    check_url = self.driver.current_url.lower()
-                                                    if '/login' not in check_url and '/signin' not in check_url:
-                                                        self.log("Detected navigation away from login - continuing")
-                                                        break
-                                                except Exception:
-                                                    break
-                                    except Exception as nav_err:
-                                        self.log(f"Error re-navigating: {nav_err}")
-                                else:
-                                    # Browser wasn't opened for login - user needs to log in
-                                    self.log(f"WARNING: Appears to be on login page (current: {self.driver.current_url})")
-                                    self.log(f"Original URL: {url}")
-                                    self.log("Browser is visible - you can manually login if needed")
-                                    # Give user time to interact if browser is visible
-                                    login_page_url = current_url  # Store the login page URL
-                                    for wait_attempt in range(6):  # Wait up to 30 seconds (6 * 5)
+                                # First time seeing login page - give user a chance to log in
+                                self.log(f"⚠ LOGIN PAGE DETECTED: {self.driver.current_url}")
+                                self.log(f"   Original URL: {url}")
+                                
+                                if not self.login_prompt_shown:
+                                    self.login_prompt_shown = True
+                                    self.log("👉 Log in now in the browser window (waiting 10 seconds)...")
+                                    self.log("   TIP: Use 'Open Browser' button next time to log in first!")
+                                    
+                                    # Wait up to 10 seconds for user to log in (reduced from 30)
+                                    login_page_url = current_url
+                                    for wait_attempt in range(2):  # 2 * 5 = 10 seconds
                                         time.sleep(5)
+                                        if not self.is_running:
+                                            break
                                         try:
-                                            # Check if we're still on a login page
                                             current_url_after_wait = self.driver.current_url.lower()
-                                            # If URL changed away from login page, assume user logged in
                                             if current_url_after_wait != login_page_url and '/login' not in current_url_after_wait and '/signin' not in current_url_after_wait:
-                                                self.log("Detected navigation away from login page - assuming login successful")
+                                                self.log("✓ Login detected! Continuing with authenticated session...")
+                                                self.user_logged_in = True
+                                                # Re-navigate to original URL now that we're logged in
+                                                self.driver.get(url)
+                                                time.sleep(2)
                                                 break
                                         except Exception:
-                                            # If we can't check, continue anyway
                                             break
-                                    self.log("Continuing with capture...")
+                                    
+                                    if not self.user_logged_in:
+                                        self.log("⚠ No login detected. Capturing login pages for protected URLs.")
+                                        self.log("   To capture actual pages: Stop, click 'Open Browser', log in, then Start again.")
+                                        self.failed_items.append(item)
+                                
+                                self.log("Continuing...")
 
                         # Cookies are preserved between pages to maintain login sessions
                         # This allows capturing multiple pages from the same site without re-authenticating
@@ -914,7 +872,7 @@ class AutoCaptureTool:
                         screenshot = self._capture_full_page()
 
                         self._save_file(item, screenshot)
-                        self.log(f"Saved {item['filename']}")
+                        self.log(f"✓ Saved {item['filename']}")
                         capture_success = True
                         break
                         
@@ -928,26 +886,48 @@ class AutoCaptureTool:
                             self.failed_items.append(item)
                     except Exception as e:
                         last_error = e
+                        error_str = str(e)
+                        
+                        # Track connection refused errors
+                        if "net::ERR_CONNECTION_REFUSED" in error_str:
+                            self.consecutive_connection_errors += 1
+                            if self.consecutive_connection_errors >= 3:
+                                self.log("=" * 50)
+                                self.log("❌ SERVER NOT RUNNING - Stopping capture")
+                                self.log("=" * 50)
+                                self.log("Your development server is not running.")
+                                self.log("Steps to fix:")
+                                self.log("  1. Open a terminal in your project folder")
+                                self.log("  2. Run: npm run dev")
+                                self.log("  3. Wait for 'Ready' message")
+                                self.log("  4. Then click Start again")
+                                self.is_running = False
+                                # Add remaining items to failed list
+                                remaining_items = self.items_to_process[i:]
+                                self.failed_items.extend(remaining_items)
+                                break
+                        
                         if attempt < MAX_RETRIES:
                             self.log(f"Retry {attempt + 1}/{MAX_RETRIES} for {url} (error: {str(e)[:50]})")
                             time.sleep(2)
                         else:
                             self.log(f"Error on {url} after {MAX_RETRIES + 1} attempts: {e}")
                             self.failed_items.append(item)
-                            # If it's a connection refused error, your local server likely isn't running
-                            if "net::ERR_CONNECTION_REFUSED" in str(e):
-                                self.log("CRITICAL: Local server not detected on port 3000.")
+                            if "net::ERR_CONNECTION_REFUSED" in error_str:
+                                self.log("⚠ Server connection refused - is your dev server running?")
+                
+                # Reset connection error counter on successful capture
+                if capture_success:
+                    self.consecutive_connection_errors = 0
                 
                 if not capture_success:
-                    self.log(f"Failed to capture {url} - continuing to next URL")
+                    self.log(f"Failed to capture {url}")
                     continue
-                else:
-                    self.log(f"✓ Successfully captured [{i+1}/{total}]: {url}")
 
             if self.is_running:
                 self.log(f"Finished processing all {total} URLs")
-                # Update progress bar to 100% on completion (use total, not len to ensure it reaches max)
-                self._update_progress("Complete", total)
+                # Update progress bar to 100% on completion
+                self._update_progress("Complete", len(self.items_to_process))
                 
                 # Calculate success count
                 success_count = total - len(self.failed_items)

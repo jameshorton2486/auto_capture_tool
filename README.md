@@ -2,14 +2,44 @@
 
 Automated screenshot capture tool for web pages with full-page scrolling support.
 
+## Features
+
+- ✅ Full-page screenshot capture (scrolls entire page)
+- ✅ Multiple output formats: PNG, JPG, PDF
+- ✅ **Persistent login sessions** - log in once, capture all protected pages
+- ✅ **Server connectivity check** - warns you if dev server isn't running
+- ✅ Smart login detection with configurable wait times
+- ✅ Retry logic for failed captures
+- ✅ Zip all captures for easy sharing
+- ✅ Dark theme UI
+
+## Quick Start for Local Development Sites
+
+If you're capturing pages from a local development server (like `localhost:3000`):
+
+### 1. Start Your Dev Server First!
+```bash
+cd your-project-folder
+npm run dev
+# Wait for "Ready" message
+```
+
+### 2. Run the Capture Tool
+Double-click `run_app.bat` or `run_app.ps1`
+
+### 3. For Protected Pages (Login Required)
+1. Click **"Open Browser"** button
+2. Log in to your website in the browser window
+3. Click **"Start"** - all pages will be captured with your logged-in session
+
+**Important:** The tool will check if your server is running before starting. If you see "Server Not Running" error, make sure `npm run dev` is running first.
+
 ## Prerequisites
 
-- Python 3.13.0 (tested with this version; may work with 3.11+)
+- Python 3.11+ (tested with 3.13.0)
 - Google Chrome browser installed
 
-## Quick Start
-
-### Installation (One-Time Setup)
+## Installation (One-Time Setup)
 
 **Easy Way (Recommended) - Run the installation script:**
 
@@ -31,7 +61,7 @@ The installation script will:
 3. Install all required dependencies
 4. Verify the installation
 
-### Running the Application
+## Running the Application
 
 **Easy Way (Recommended) - Double-click one of these:**
 - `run_app.bat` - For Command Prompt
@@ -43,6 +73,22 @@ These launcher scripts automatically:
 - Install missing dependencies if needed
 - Run the application
 - Keep the window open if there's an error
+
+## Options Explained
+
+| Option | Description |
+|--------|-------------|
+| **Include domain in folder structure** | Creates subfolders by domain name |
+| **Skip login pages** | Skips pages that require authentication (not recommended) |
+| **Keep login sessions** | Saves Chrome profile between runs so you stay logged in |
+| **Run headless** | Runs browser invisibly (no window) |
+
+## Tips for Best Results
+
+1. **Always use "Open Browser" for protected pages** - Log in first, then start capture
+2. **Keep "Keep login sessions" checked** - Your login persists between app restarts
+3. **Increase delay for slow-loading pages** - Use 3-5 seconds for JavaScript-heavy sites
+4. **Use "Retry Failed"** after fixing issues - Don't re-capture everything
 
 ## Manual Setup (Alternative)
 
@@ -135,6 +181,18 @@ auto_capture_tool/
 
 ## Troubleshooting
 
+### "Server Not Running" Error
+Make sure your development server is running before starting capture:
+```bash
+npm run dev  # or whatever starts your dev server
+```
+
+### Capturing Login Pages Instead of Actual Content
+This means you're not logged in. Solution:
+1. Click "Open Browser" 
+2. Log in to your website
+3. Then click "Start"
+
 ### Virtual Environment Not Found Error
 
 If you see "Virtual environment not found", run the installation script first:
@@ -153,7 +211,7 @@ The launcher scripts (`run_app.bat` or `run_app.ps1`) automatically detect and s
 
 ### Python Command Not Found
 
-Make sure Python 3.13.0 (or 3.11+) is installed and in your PATH. You can check by running:
+Make sure Python 3.11+ is installed and in your PATH. You can check by running:
 ```powershell
 python --version
 ```
