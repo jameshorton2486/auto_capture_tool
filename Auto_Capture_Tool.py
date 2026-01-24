@@ -49,8 +49,8 @@ class AutoCaptureTool:
         self.root.configure(bg=DarkTheme.BG_MAIN)
 
         # Resizable compact UI
-        self.root.geometry("720x480")
-        self.root.minsize(680, 420)
+        self.root.geometry("820x620")
+        self.root.minsize(720, 560)
 
         # TRACKERS
         self.items_to_process = []
@@ -128,15 +128,20 @@ class AutoCaptureTool:
     #                     BUILD UI
     # ==================================================
     def _build_ui(self):
-
+        self.root.grid_columnconfigure(0, weight=1)
+        self.root.grid_rowconfigure(3, weight=1)
+        self.root.grid_rowconfigure(4, weight=1)
+        
         # ---------- OUTPUT FOLDER ----------
         top_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=10)
-        top_frame.pack(fill=tk.X)
+        top_frame.grid(row=0, column=0, sticky="ew")
+        top_frame.grid_columnconfigure(0, weight=1)
 
         ttk.Label(top_frame, text="Save Files To:", style="Panel.TLabel").pack(anchor="w")
 
         dir_frame = ttk.Frame(top_frame, style="Panel.TFrame")
         dir_frame.pack(fill=tk.X)
+        dir_frame.grid_columnconfigure(0, weight=1)
 
         self.entry_dir = ttk.Entry(dir_frame)
         self.entry_dir.pack(side=tk.LEFT, fill=tk.X, expand=True)
@@ -163,7 +168,7 @@ class AutoCaptureTool:
 
         # ---------- OPTIONS ----------
         opt_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=10)
-        opt_frame.pack(fill=tk.X)
+        opt_frame.grid(row=1, column=0, sticky="ew")
 
         self.include_domain_var = tk.BooleanVar(value=True)
         chk = tk.Checkbutton(
@@ -215,7 +220,7 @@ class AutoCaptureTool:
 
         # ---------- FORMAT + SETTINGS ----------
         settings_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=10)
-        settings_frame.pack(fill=tk.X)
+        settings_frame.grid(row=2, column=0, sticky="ew")
 
         ttk.Label(settings_frame, text="Format:", style="Panel.TLabel").pack(side=tk.LEFT)
 
@@ -256,9 +261,11 @@ class AutoCaptureTool:
 
         # ---------- URL INPUT ----------
         mid_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=10)
-        mid_frame.pack(fill=tk.BOTH, expand=True)
+        mid_frame.grid(row=3, column=0, sticky="nsew")
+        mid_frame.grid_columnconfigure(0, weight=1)
+        mid_frame.grid_rowconfigure(1, weight=1)
 
-        ttk.Label(mid_frame, text="Paste URLs (one per line):", style="Panel.TLabel").pack(anchor="w")
+        ttk.Label(mid_frame, text="Paste URLs (one per line):", style="Panel.TLabel").grid(row=0, column=0, sticky="w")
 
         self.text_area = scrolledtext.ScrolledText(
             mid_frame,
@@ -269,13 +276,15 @@ class AutoCaptureTool:
             relief="flat",
             borderwidth=1
         )
-        self.text_area.pack(fill=tk.BOTH, expand=True, pady=5)
+        self.text_area.grid(row=1, column=0, sticky="nsew", pady=5)
 
         # ---------- LOGGING PANEL ----------
         log_frame = ttk.Frame(self.root, style="Panel.TFrame")
-        log_frame.pack(fill=tk.BOTH, expand=True)
+        log_frame.grid(row=4, column=0, sticky="nsew")
+        log_frame.grid_columnconfigure(0, weight=1)
+        log_frame.grid_rowconfigure(1, weight=1)
 
-        ttk.Label(log_frame, text="Log Output:", style="Panel.TLabel").pack(anchor="w", padx=10)
+        ttk.Label(log_frame, text="Log Output:", style="Panel.TLabel").grid(row=0, column=0, sticky="w", padx=10)
 
         self.log_box = scrolledtext.ScrolledText(
             log_frame,
@@ -285,11 +294,11 @@ class AutoCaptureTool:
             insertbackground="#E5E5E5",
             relief="flat"
         )
-        self.log_box.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+        self.log_box.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
 
         # ---------- BUTTONS ----------
         btn_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=10)
-        btn_frame.pack(fill=tk.X)
+        btn_frame.grid(row=5, column=0, sticky="ew")
 
         self.preview_btn = tk.Button(
             btn_frame,
@@ -358,10 +367,21 @@ class AutoCaptureTool:
             pady=4
         )
         self.login_btn.pack(side=tk.LEFT, padx=5)
+        
+        self.clear_profile_btn = tk.Button(
+            btn_frame,
+            text="Clear Profile",
+            command=self.clear_chrome_profile,
+            bg=DarkTheme.BG_INPUT,
+            fg=DarkTheme.FG_TEXT,
+            padx=6,
+            pady=4
+        )
+        self.clear_profile_btn.pack(side=tk.LEFT, padx=5)
 
         # ---------- STATUS BAR ----------
         status_frame = ttk.Frame(self.root, style="Panel.TFrame")
-        status_frame.pack(fill=tk.X)
+        status_frame.grid(row=6, column=0, sticky="ew")
 
         self.progress_var = tk.StringVar(value="Ready")
         self.progress_label = ttk.Label(
@@ -589,6 +609,43 @@ class AutoCaptureTool:
         if folder:
             self.entry_dir.delete(0, tk.END)
             self.entry_dir.insert(0, folder)
+    
+    def clear_chrome_profile(self):
+        """Clear the Chrome profile directory to free up space."""
+        if not os.path.exists(self.chrome_user_data_dir):
+            messagebox.showinfo("Clear Profile", "Chrome profile directory does not exist.")
+            return
+        
+        # Confirm with user
+        result = messagebox.askyesno(
+            "Clear Chrome Profile",
+            f"This will delete all saved Chrome profile data at:\n{self.chrome_user_data_dir}\n\n"
+            "This will remove saved login sessions and cookies.\n\n"
+            "Continue?",
+            icon="warning"
+        )
+        
+        if not result:
+            return
+        
+        # Close browser if open
+        if self.driver is not None:
+            try:
+                self.driver.quit()
+                self.driver = None
+                self.log("Browser closed before clearing profile")
+            except Exception as e:
+                self.log(f"Error closing browser: {e}")
+        
+        # Delete profile directory
+        try:
+            import shutil
+            shutil.rmtree(self.chrome_user_data_dir)
+            self.log(f"Cleared Chrome profile: {self.chrome_user_data_dir}")
+            messagebox.showinfo("Clear Profile", "Chrome profile cleared successfully.")
+        except Exception as e:
+            self.log(f"Error clearing profile: {e}")
+            messagebox.showerror("Error", f"Failed to clear Chrome profile:\n{e}")
 
     # ==================================================
     #                 CAPTURE THREAD
