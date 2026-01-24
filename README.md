@@ -15,24 +15,67 @@ Automated screenshot capture tool for web pages with full-page scrolling support
 
 ## Quick Start for Local Development Sites
 
-If you're capturing pages from a local development server (like `localhost:3000`):
+### First-Time Setup (One-Time)
 
-### 1. Start Your Dev Server First!
-```bash
-cd your-project-folder
-npm run dev
-# Wait for "Ready" message
+**Install the application:**
+- **PowerShell:** Right-click `install.ps1` → "Run with PowerShell" (or run `.\install.ps1`)
+- **Command Prompt:** Double-click `install.bat` (or run `install.bat`)
+
+This creates a virtual environment and installs all dependencies.
+
+### Running the Application
+
+**Easiest Way - Double-click:**
+- `run_app.ps1` (PowerShell - right-click → "Run with PowerShell")
+- `run_app.bat` (Command Prompt - just double-click)
+
+**Or from command line:**
+```powershell
+.\run_app.ps1    # PowerShell
+run_app.bat      # Command Prompt
 ```
 
-### 2. Run the Capture Tool
-Double-click `run_app.bat` or `run_app.ps1`
+The launcher scripts automatically:
+- ✅ Check if virtual environment exists
+- ✅ Detect Tcl/Tk paths (fixes tkinter GUI issues)
+- ✅ Install missing dependencies if needed
+- ✅ Run the application
 
-### 3. For Protected Pages (Login Required)
-1. Click **"Open Browser"** button
-2. Log in to your website in the browser window
-3. Click **"Start"** - all pages will be captured with your logged-in session
+### For Protected Pages (Login Required)
+
+1. **Start your dev server first:**
+   ```bash
+   cd your-project-folder
+   npm run dev
+   # Wait for "Ready" message
+   ```
+
+2. **Run the capture tool:** Double-click `run_app.ps1` or `run_app.bat`
+
+3. **Login workflow:**
+   - Click **"Open Browser"** button
+   - Log in to your website in the browser window
+   - Click **"Start"** - all pages will be captured with your logged-in session
 
 **Important:** The tool will check if your server is running before starting. If you see "Server Not Running" error, make sure `npm run dev` is running first.
+
+### Manual Method (If You Prefer)
+
+If you want to activate the virtual environment manually:
+
+**PowerShell:**
+```powershell
+.\venv\Scripts\Activate.ps1
+python Auto_Capture_Tool.py
+```
+
+**Command Prompt:**
+```cmd
+venv\Scripts\activate.bat
+python Auto_Capture_Tool.py
+```
+
+See `QUICK_START.md` for detailed instructions.
 
 ## Prerequisites
 
