@@ -48,9 +48,21 @@ class AutoCaptureTool:
         self.root.title("Auto Full Page Capture Tool")
         self.root.configure(bg=DarkTheme.BG_MAIN)
 
-        # Resizable compact UI
-        self.root.geometry("820x620")
-        self.root.minsize(720, 560)
+        # Resizable compact UI - optimized for smaller screens
+        # Detect screen size and adjust accordingly
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+
+        # Default compact size that fits most screens
+        window_width = min(780, int(screen_width * 0.85))
+        window_height = min(560, int(screen_height * 0.85))
+
+        # Center window on screen
+        x = (screen_width - window_width) // 2
+        y = (screen_height - window_height) // 2
+
+        self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
+        self.root.minsize(680, 480)
 
         # TRACKERS
         self.items_to_process = []
@@ -130,7 +142,7 @@ class AutoCaptureTool:
         self.root.grid_rowconfigure(4, weight=1)
 
         # ---------- OUTPUT FOLDER ----------
-        top_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=10)
+        top_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=6)
         top_frame.grid(row=0, column=0, sticky="ew")
         top_frame.grid_columnconfigure(0, weight=1)
 
@@ -164,7 +176,7 @@ class AutoCaptureTool:
             pass
 
         # ---------- OPTIONS ----------
-        opt_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=10)
+        opt_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=4)
         opt_frame.grid(row=1, column=0, sticky="ew")
 
         self.include_domain_var = tk.BooleanVar(value=True)
@@ -216,7 +228,7 @@ class AutoCaptureTool:
         chk_headless.pack(anchor="w")
 
         # ---------- FORMAT + SETTINGS ----------
-        settings_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=10)
+        settings_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=6)
         settings_frame.grid(row=2, column=0, sticky="ew")
 
         ttk.Label(settings_frame, text="Format:", style="Panel.TLabel").pack(side=tk.LEFT)
@@ -236,7 +248,9 @@ class AutoCaptureTool:
             rb.pack(side=tk.LEFT, padx=10)
 
         # Browser width dropdown
-        ttk.Label(settings_frame, text="Width:", style="Panel.TLabel").pack(side=tk.LEFT, padx=(20, 5))
+        ttk.Label(settings_frame, text="Width:", style="Panel.TLabel").pack(
+            side=tk.LEFT, padx=(20, 5)
+        )
         self.width_var = tk.StringVar(value="1400")
         width_combo = ttk.Combobox(
             settings_frame,
@@ -246,7 +260,9 @@ class AutoCaptureTool:
         )
         width_combo.pack(side=tk.LEFT)
 
-        ttk.Label(settings_frame, text="Delay (sec):", style="Panel.TLabel").pack(side=tk.LEFT, padx=(20, 5))
+        ttk.Label(settings_frame, text="Delay (sec):", style="Panel.TLabel").pack(
+            side=tk.LEFT, padx=(20, 5)
+        )
         self.delay_var = tk.StringVar(value="2")
         delay_combo = ttk.Combobox(
             settings_frame, textvariable=self.delay_var, values=["1", "2", "3", "5", "10"], width=4
@@ -254,23 +270,26 @@ class AutoCaptureTool:
         delay_combo.pack(side=tk.LEFT)
 
         # ---------- URL INPUT ----------
-        mid_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=10)
+        mid_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=6)
         mid_frame.grid(row=3, column=0, sticky="nsew")
         mid_frame.grid_columnconfigure(0, weight=1)
         mid_frame.grid_rowconfigure(1, weight=1)
 
-        ttk.Label(mid_frame, text="Paste URLs (one per line):", style="Panel.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(mid_frame, text="Paste URLs (one per line):", style="Panel.TLabel").grid(
+            row=0, column=0, sticky="w"
+        )
 
         self.text_area = scrolledtext.ScrolledText(
             mid_frame,
-            height=4,
+            height=3,
             bg=DarkTheme.BG_INPUT,
             fg=DarkTheme.FG_TEXT,
             insertbackground=DarkTheme.FG_TEXT,
             relief="flat",
             borderwidth=1,
+            font=("Consolas", 9),
         )
-        self.text_area.grid(row=1, column=0, sticky="nsew", pady=5)
+        self.text_area.grid(row=1, column=0, sticky="nsew", pady=3)
 
         # ---------- LOGGING PANEL ----------
         log_frame = ttk.Frame(self.root, style="Panel.TFrame")
@@ -278,32 +297,36 @@ class AutoCaptureTool:
         log_frame.grid_columnconfigure(0, weight=1)
         log_frame.grid_rowconfigure(1, weight=1)
 
-        ttk.Label(log_frame, text="Log Output:", style="Panel.TLabel").grid(row=0, column=0, sticky="w", padx=10)
+        ttk.Label(log_frame, text="Log:", style="Panel.TLabel").grid(
+            row=0, column=0, sticky="w", padx=6
+        )
 
         self.log_box = scrolledtext.ScrolledText(
             log_frame,
-            height=6,
+            height=5,
             bg="#111111",
             fg="#E5E5E5",
             insertbackground="#E5E5E5",
             relief="flat",
+            font=("Consolas", 9),
         )
-        self.log_box.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
+        self.log_box.grid(row=1, column=0, sticky="nsew", padx=6, pady=3)
 
         # ---------- BUTTONS ----------
-        btn_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=10)
+        btn_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=6)
         btn_frame.grid(row=5, column=0, sticky="ew")
 
         self.preview_btn = tk.Button(
             btn_frame,
-            text="Preview URLs",
+            text="Preview",
             command=self.preview_urls,
             bg=DarkTheme.BTN_ORANGE,
             fg="black",
-            padx=6,
-            pady=4,
+            padx=4,
+            pady=2,
+            font=("Arial", 9),
         )
-        self.preview_btn.pack(side=tk.LEFT, padx=5)
+        self.preview_btn.pack(side=tk.LEFT, padx=3)
 
         self.start_btn = tk.Button(
             btn_frame,
@@ -311,10 +334,11 @@ class AutoCaptureTool:
             command=self.start_capture,
             bg=DarkTheme.BTN_GREEN,
             fg="black",
-            padx=6,
-            pady=4,
+            padx=4,
+            pady=2,
+            font=("Arial", 9),
         )
-        self.start_btn.pack(side=tk.RIGHT, padx=5)
+        self.start_btn.pack(side=tk.RIGHT, padx=3)
 
         self.stop_btn = tk.Button(
             btn_frame,
@@ -323,69 +347,76 @@ class AutoCaptureTool:
             state=tk.DISABLED,
             bg=DarkTheme.BTN_RED,
             fg="white",
-            padx=6,
-            pady=4,
+            padx=4,
+            pady=2,
+            font=("Arial", 9),
         )
-        self.stop_btn.pack(side=tk.RIGHT, padx=5)
+        self.stop_btn.pack(side=tk.RIGHT, padx=3)
 
         self.retry_btn = tk.Button(
             btn_frame,
-            text="Retry Failed",
+            text="Retry",
             command=self.retry_failed,
             state=tk.DISABLED,
             bg=DarkTheme.BTN_BLUE,
             fg="white",
-            padx=6,
-            pady=4,
+            padx=4,
+            pady=2,
+            font=("Arial", 9),
         )
-        self.retry_btn.pack(side=tk.RIGHT, padx=5)
+        self.retry_btn.pack(side=tk.RIGHT, padx=3)
 
         self.zip_btn = tk.Button(
             btn_frame,
-            text="Zip Files",
+            text="Zip",
             command=self.zip_all_files,
             bg=DarkTheme.BTN_ORANGE,
             fg="black",
-            padx=6,
-            pady=4,
+            padx=4,
+            pady=2,
+            font=("Arial", 9),
         )
-        self.zip_btn.pack(side=tk.LEFT, padx=5)
+        self.zip_btn.pack(side=tk.LEFT, padx=3)
 
         self.login_btn = tk.Button(
             btn_frame,
-            text="Open Browser",
+            text="Browser",
             command=self.open_browser_for_login,
             bg=DarkTheme.BTN_BLUE,
             fg="white",
-            padx=6,
-            pady=4,
+            padx=4,
+            pady=2,
+            font=("Arial", 9),
         )
-        self.login_btn.pack(side=tk.LEFT, padx=5)
+        self.login_btn.pack(side=tk.LEFT, padx=3)
 
         self.clear_profile_btn = tk.Button(
             btn_frame,
-            text="Clear Profile",
+            text="Clear",
             command=self.clear_chrome_profile,
             bg=DarkTheme.BG_INPUT,
             fg=DarkTheme.FG_TEXT,
-            padx=6,
-            pady=4,
+            padx=4,
+            pady=2,
+            font=("Arial", 9),
         )
-        self.clear_profile_btn.pack(side=tk.LEFT, padx=5)
+        self.clear_profile_btn.pack(side=tk.LEFT, padx=3)
 
         # ---------- STATUS BAR ----------
         status_frame = ttk.Frame(self.root, style="Panel.TFrame")
         status_frame.grid(row=6, column=0, sticky="ew")
 
         self.progress_var = tk.StringVar(value="Ready")
-        self.progress_label = ttk.Label(status_frame, textvariable=self.progress_var, style="Panel.TLabel")
-        self.progress_label.pack(side=tk.LEFT, padx=10)
+        self.progress_label = ttk.Label(
+            status_frame, textvariable=self.progress_var, style="Panel.TLabel"
+        )
+        self.progress_label.pack(side=tk.LEFT, padx=6)
 
         self.progress_bar = ttk.Progressbar(
             status_frame,
             mode="determinate",
         )
-        self.progress_bar.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=10)
+        self.progress_bar.pack(side=tk.RIGHT, fill=tk.X, expand=True, padx=6)
 
     # ==================================================
     #                       LOGGING
@@ -729,7 +760,9 @@ class AutoCaptureTool:
                 messagebox.showerror("Invalid Input", "Width must be between 100 and 5000 pixels.")
                 return
         except ValueError:
-            messagebox.showerror("Invalid Input", f"Width must be a number. Got: '{self.width_var.get()}'")
+            messagebox.showerror(
+                "Invalid Input", f"Width must be a number. Got: '{self.width_var.get()}'"
+            )
             return
 
         try:
@@ -738,7 +771,9 @@ class AutoCaptureTool:
                 messagebox.showerror("Invalid Input", "Delay must be between 0 and 60 seconds.")
                 return
         except ValueError:
-            messagebox.showerror("Invalid Input", "Delay must be a number. Got: '{}'".format(self.delay_var.get()))
+            messagebox.showerror(
+                "Invalid Input", f"Delay must be a number. Got: '{self.delay_var.get()}'"
+            )
             return
 
         # Clear failed items from previous capture runs
@@ -807,7 +842,9 @@ class AutoCaptureTool:
                 messagebox.showerror("Invalid Input", "Width must be between 100 and 5000 pixels.")
                 return
         except ValueError:
-            messagebox.showerror("Invalid Input", f"Width must be a number. Got: '{self.width_var.get()}'")
+            messagebox.showerror(
+                "Invalid Input", f"Width must be a number. Got: '{self.width_var.get()}'"
+            )
             return
         options = Options()
 
@@ -818,7 +855,9 @@ class AutoCaptureTool:
 
         try:
             self.log("Opening browser for manual login...")
-            self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+            self.driver = webdriver.Chrome(
+                service=Service(ChromeDriverManager().install()), options=options
+            )
             self.driver.set_window_size(width, 900)
             self.browser_opened_for_login = True
             self.log("Browser opened. Log in to sites as needed, then click 'Start' to capture.")
@@ -873,7 +912,9 @@ class AutoCaptureTool:
 
                 def init_driver():
                     self.log("Initializing browser...")
-                    new_driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+                    new_driver = webdriver.Chrome(
+                        service=Service(ChromeDriverManager().install()), options=options
+                    )
                     new_driver.set_window_size(width, 900)
                     # Set page load timeout
                     new_driver.set_page_load_timeout(60)
@@ -941,7 +982,9 @@ class AutoCaptureTool:
                                 # Recreate browser with same options
                                 options = Options()
                                 if self.persist_session_var.get():
-                                    options.add_argument(f"--user-data-dir={self.chrome_user_data_dir}")
+                                    options.add_argument(
+                                        f"--user-data-dir={self.chrome_user_data_dir}"
+                                    )
                                 # Note: Cookies are allowed during the session to maintain login state
                                 if self.headless_var.get():
                                     options.add_argument("--headless=new")
@@ -951,7 +994,9 @@ class AutoCaptureTool:
                                 )
                                 self.driver.set_window_size(width, 900)
                                 self.driver.set_page_load_timeout(60)
-                                self.browser_opened_for_login = False  # Reset flag since we're recreating
+                                self.browser_opened_for_login = (
+                                    False  # Reset flag since we're recreating
+                                )
                                 self.log("Browser restarted successfully")
                             except Exception as re_init_err:
                                 self.log(f"Failed to restart browser: {re_init_err}")
@@ -973,15 +1018,20 @@ class AutoCaptureTool:
                         # Wait for page to load (wait for document.readyState)
                         try:
                             WebDriverWait(self.driver, delay + 5).until(
-                                lambda d: d.execute_script("return document.readyState") == "complete"
+                                lambda d: d.execute_script("return document.readyState")
+                                == "complete"
                             )
                         except TimeoutException:
                             if attempt < MAX_RETRIES:
-                                self.log(f"Retry {attempt + 1}/{MAX_RETRIES} for {url} (page load timeout)")
+                                self.log(
+                                    f"Retry {attempt + 1}/{MAX_RETRIES} for {url} (page load timeout)"
+                                )
                                 time.sleep(2)
                                 continue
                             else:
-                                self.log(f"Warning: Page load timeout for {url}, proceeding anyway...")
+                                self.log(
+                                    f"Warning: Page load timeout for {url}, proceeding anyway..."
+                                )
 
                         # Additional wait for dynamic content
                         time.sleep(1)
@@ -990,13 +1040,17 @@ class AutoCaptureTool:
                         current_url = self.driver.current_url.lower()
                         original_url_lower = url.lower()
                         page_title = self.driver.title.lower()
-                        page_source = self.driver.page_source.lower()[:10000]  # Sample first 10k chars for performance
+                        page_source = self.driver.page_source.lower()[
+                            :10000
+                        ]  # Sample first 10k chars for performance
 
                         # Common login page indicators (only check if URL changed significantly)
                         is_login_page = False
                         if current_url != original_url_lower:
                             login_indicators = [
-                                "/login" in current_url or "/signin" in current_url or "/auth" in current_url,
+                                "/login" in current_url
+                                or "/signin" in current_url
+                                or "/auth" in current_url,
                                 "sign in" in page_title or "log in" in page_title,
                                 "authentication required" in page_title,
                                 (
@@ -1025,8 +1079,12 @@ class AutoCaptureTool:
 
                                 if not self.login_prompt_shown:
                                     self.login_prompt_shown = True
-                                    self.log("👉 Log in now in the browser window (waiting 10 seconds)...")
-                                    self.log("   TIP: Use 'Open Browser' button next time to log in first!")
+                                    self.log(
+                                        "👉 Log in now in the browser window (waiting 10 seconds)..."
+                                    )
+                                    self.log(
+                                        "   TIP: Use 'Open Browser' button next time to log in first!"
+                                    )
 
                                     # Wait up to 10 seconds for user to log in (reduced from 30)
                                     login_page_url = current_url
@@ -1041,7 +1099,9 @@ class AutoCaptureTool:
                                                 and "/login" not in current_url_after_wait
                                                 and "/signin" not in current_url_after_wait
                                             ):
-                                                self.log("✓ Login detected! Continuing with authenticated session...")
+                                                self.log(
+                                                    "✓ Login detected! Continuing with authenticated session..."
+                                                )
                                                 self.user_logged_in = True
                                                 # Re-navigate to original URL now that we're logged in
                                                 self.driver.get(url)
@@ -1051,7 +1111,9 @@ class AutoCaptureTool:
                                             break
 
                                     if not self.user_logged_in:
-                                        self.log("⚠ No login detected. Capturing login pages for protected URLs.")
+                                        self.log(
+                                            "⚠ No login detected. Capturing login pages for protected URLs."
+                                        )
                                         self.log(
                                             "   To capture actual pages: Stop, click 'Open Browser', log in, then Start again."
                                         )
@@ -1100,13 +1162,17 @@ class AutoCaptureTool:
                                 break
 
                         if attempt < MAX_RETRIES:
-                            self.log(f"Retry {attempt + 1}/{MAX_RETRIES} for {url} (error: {str(e)[:50]})")
+                            self.log(
+                                f"Retry {attempt + 1}/{MAX_RETRIES} for {url} (error: {str(e)[:50]})"
+                            )
                             time.sleep(2)
                         else:
                             self.log(f"Error on {url} after {MAX_RETRIES + 1} attempts: {e}")
                             self.failed_items.append(item)
                             if "net::ERR_CONNECTION_REFUSED" in error_str:
-                                self.log("⚠ Server connection refused - is your dev server running?")
+                                self.log(
+                                    "⚠ Server connection refused - is your dev server running?"
+                                )
 
                 # Reset connection error counter on successful capture
                 if capture_success:
@@ -1123,7 +1189,9 @@ class AutoCaptureTool:
 
                 # Calculate success count
                 success_count = total - len(self.failed_items)
-                self.log(f"Summary: {success_count} succeeded, {len(self.failed_items)} failed out of {total} total")
+                self.log(
+                    f"Summary: {success_count} succeeded, {len(self.failed_items)} failed out of {total} total"
+                )
 
                 if self.failed_items:
                     self.log(f"Failed URLs: {[item['url'] for item in self.failed_items]}")
@@ -1139,7 +1207,9 @@ class AutoCaptureTool:
                     self.log("Capture process finished successfully - all URLs captured!")
 
                     def show_success():
-                        messagebox.showinfo("Done", f"Capture completed successfully!\n\nAll {total} URLs captured.")
+                        messagebox.showinfo(
+                            "Done", f"Capture completed successfully!\n\nAll {total} URLs captured."
+                        )
 
                     self.root.after(0, show_success)
 
@@ -1189,7 +1259,9 @@ class AutoCaptureTool:
     # ==================================================
     def _capture_full_page(self):
         total_height = self.driver.execute_script(
-            "return Math.max(" "document.body.scrollHeight," "document.documentElement.scrollHeight)"
+            "return Math.max("
+            "document.body.scrollHeight,"
+            "document.documentElement.scrollHeight)"
         )
 
         browser_width = int(self.width_var.get())
@@ -1198,8 +1270,12 @@ class AutoCaptureTool:
 
         # Warn if page is longer than capture limit
         if total_height > MAX_CAPTURE_HEIGHT:
-            self.log(f"⚠ WARNING: Page height ({total_height}px) exceeds capture limit ({MAX_CAPTURE_HEIGHT}px)")
-            self.log("   Page will be truncated. Consider using a tiling strategy for very long pages.")
+            self.log(
+                f"⚠ WARNING: Page height ({total_height}px) exceeds capture limit ({MAX_CAPTURE_HEIGHT}px)"
+            )
+            self.log(
+                "   Page will be truncated. Consider using a tiling strategy for very long pages."
+            )
 
         self.driver.set_window_size(browser_width, max_height)
         time.sleep(0.3)
@@ -1213,7 +1289,9 @@ class AutoCaptureTool:
         self.driver.execute_script("window.scrollTo(0, 0);")
         time.sleep(0.2)
 
-        data = self.driver.execute_cdp_cmd("Page.captureScreenshot", {"format": "png", "captureBeyondViewport": True})
+        data = self.driver.execute_cdp_cmd(
+            "Page.captureScreenshot", {"format": "png", "captureBeyondViewport": True}
+        )
 
         return base64.b64decode(data["data"])
 
@@ -1235,7 +1313,11 @@ class AutoCaptureTool:
 
     def _save_file(self, item, screenshot_bytes):
         """Save screenshot file with Windows-safe path handling."""
-        folder = os.path.join(self.root_save_directory, item["subdir"]) if item["subdir"] else self.root_save_directory
+        folder = (
+            os.path.join(self.root_save_directory, item["subdir"])
+            if item["subdir"]
+            else self.root_save_directory
+        )
 
         # Ensure folder path is absolute and normalized for Windows
         folder = os.path.normpath(os.path.abspath(folder))
@@ -1276,8 +1358,14 @@ class AutoCaptureTool:
             return
 
         # Ask user where to save the zip file(s)
-        zip_dir = os.path.dirname(self.root_save_directory) if self.root_save_directory else os.path.expanduser("~")
-        default_zip_name = os.path.join(zip_dir, f"captures_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip")
+        zip_dir = (
+            os.path.dirname(self.root_save_directory)
+            if self.root_save_directory
+            else os.path.expanduser("~")
+        )
+        default_zip_name = os.path.join(
+            zip_dir, f"captures_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        )
 
         zip_path = filedialog.asksaveasfilename(
             title="Save Zip File",
@@ -1348,7 +1436,9 @@ class AutoCaptureTool:
                 # Check current zip file size on disk
                 # Note: ZipFile doesn't have flush(), we track size by checking the file on disk
                 # Close and reopen if needed, or just check file size directly
-                current_zip_size = os.path.getsize(current_zip_path) if os.path.exists(current_zip_path) else 0
+                current_zip_size = (
+                    os.path.getsize(current_zip_path) if os.path.exists(current_zip_path) else 0
+                )
 
                 # Estimate compressed size (conservative: assume 40% compression for images)
                 # Add overhead for ZIP entry metadata
@@ -1360,11 +1450,15 @@ class AutoCaptureTool:
                     current_zip.close()
                     actual_size = os.path.getsize(current_zip_path)
                     zip_files_created.append(current_zip_path)
-                    self.log(f"Created {os.path.basename(current_zip_path)} ({actual_size / 1024 / 1024:.2f} MB)")
+                    self.log(
+                        f"Created {os.path.basename(current_zip_path)} ({actual_size / 1024 / 1024:.2f} MB)"
+                    )
 
                     # Start new zip
                     zip_index += 1
-                    current_zip_path = os.path.join(zip_dir, f"{zip_basename}_part{zip_index}{zip_ext}")
+                    current_zip_path = os.path.join(
+                        zip_dir, f"{zip_basename}_part{zip_index}{zip_ext}"
+                    )
                     current_zip = zipfile.ZipFile(current_zip_path, "w", zipfile.ZIP_DEFLATED)
 
                 # Add file to current zip
