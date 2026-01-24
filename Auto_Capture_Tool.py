@@ -512,17 +512,42 @@ class AutoCaptureTool:
     def check_server_connectivity(self, url: str, timeout: int = 5):
         """Check if the server is reachable before starting capture.
         Returns (is_reachable, error_message)
+        Tries HEAD first, falls back to GET if HEAD is not supported.
         """
         try:
             parsed = urlparse(url)
             test_url = f"{parsed.scheme}://{parsed.netloc}"
-            req = urllib.request.Request(test_url, method='HEAD')
-            urllib.request.urlopen(req, timeout=timeout)
-            return True, ""
-        except urllib.error.URLError as e:
-            if "Connection refused" in str(e) or "ERR_CONNECTION_REFUSED" in str(e):
-                return False, f"Server not running at {parsed.netloc}. Start your dev server first (npm run dev)."
-            return False, f"Cannot reach server: {e.reason}"
+            
+            # Try HEAD request first (lighter, preferred)
+            try:
+                req = urllib.request.Request(test_url, method='HEAD')
+                urllib.request.urlopen(req, timeout=timeout)
+                return True, ""
+            except urllib.error.HTTPError as e:
+                # HTTP error means server is reachable (even if it returns an error)
+                if e.code < 500:  # 4xx errors mean server is up
+                    return True, ""
+                return False, f"Server error: {e.code}"
+            except urllib.error.URLError:
+                # HEAD failed, try GET as fallback (some servers don't support HEAD)
+                pass
+            
+            # Fallback to GET request
+            try:
+                req = urllib.request.Request(test_url, method='GET')
+                # Only read a small amount to avoid downloading full page
+                with urllib.request.urlopen(req, timeout=timeout) as response:
+                    response.read(1)  # Read just 1 byte to verify connection
+                return True, ""
+            except urllib.error.HTTPError as e:
+                # HTTP error means server is reachable
+                if e.code < 500:
+                    return True, ""
+                return False, f"Server error: {e.code}"
+            except urllib.error.URLError as e:
+                if "Connection refused" in str(e) or "ERR_CONNECTION_REFUSED" in str(e):
+                    return False, f"Server not running at {parsed.netloc}. Start your dev server first (npm run dev)."
+                return False, f"Cannot reach server: {e.reason}"
         except Exception as e:
             return False, f"Connection error: {str(e)}"
 
@@ -621,6 +646,25 @@ class AutoCaptureTool:
                 return
             self.log("Server is reachable!")
 
+        # Validate width and delay inputs
+        try:
+            width = int(self.width_var.get())
+            if width < 100 or width > 5000:
+                messagebox.showerror("Invalid Input", "Width must be between 100 and 5000 pixels.")
+                return
+        except ValueError:
+            messagebox.showerror("Invalid Input", f"Width must be a number. Got: '{self.width_var.get()}'")
+            return
+        
+        try:
+            delay = int(self.delay_var.get())
+            if delay < 0 or delay > 60:
+                messagebox.showerror("Invalid Input", "Delay must be between 0 and 60 seconds.")
+                return
+        except ValueError:
+            messagebox.showerror("Invalid Input", f"Delay must be a number. Got: '{self.delay_var.get()}'")
+            return
+
         # Clear failed items from previous capture runs
         self.failed_items = []
         
@@ -677,7 +721,15 @@ class AutoCaptureTool:
             messagebox.showinfo("Browser Open", "Browser is already open. Close it first if you want to start fresh.")
             return
         
-        width = int(self.width_var.get())
+        # Validate width input
+        try:
+            width = int(self.width_var.get())
+            if width < 100 or width > 5000:
+                messagebox.showerror("Invalid Input", "Width must be between 100 and 5000 pixels.")
+                return
+        except ValueError:
+            messagebox.showerror("Invalid Input", f"Width must be a number. Got: '{self.width_var.get()}'")
+            return
         options = Options()
         
         # Use persistent profile if enabled
@@ -707,8 +759,24 @@ class AutoCaptureTool:
     # ==================================================
     def _capture_loop(self):
         try:
-            width = int(self.width_var.get())
-            delay = int(self.delay_var.get())
+            # Input validation already done in start_capture, but validate again for safety
+            try:
+                width = int(self.width_var.get())
+                if width < 100 or width > 5000:
+                    self.log(f"ERROR: Invalid width {width}, using default 1400")
+                    width = 1400
+            except (ValueError, AttributeError):
+                self.log("ERROR: Invalid width value, using default 1400")
+                width = 1400
+            
+            try:
+                delay = int(self.delay_var.get())
+                if delay < 0 or delay > 60:
+                    self.log(f"ERROR: Invalid delay {delay}, using default 2")
+                    delay = 2
+            except (ValueError, AttributeError):
+                self.log("ERROR: Invalid delay value, using default 2")
+                delay = 2
 
             # Initialize browser if not already open
             if self.driver is None:
@@ -1033,7 +1101,13 @@ class AutoCaptureTool:
         )
 
         browser_width = int(self.width_var.get())
-        max_height = min(total_height + 200, 16000)
+        MAX_CAPTURE_HEIGHT = 16000  # Windows-safe limit
+        max_height = min(total_height + 200, MAX_CAPTURE_HEIGHT)
+        
+        # Warn if page is longer than capture limit
+        if total_height > MAX_CAPTURE_HEIGHT:
+            self.log(f"⚠ WARNING: Page height ({total_height}px) exceeds capture limit ({MAX_CAPTURE_HEIGHT}px)")
+            self.log(f"   Page will be truncated. Consider using a tiling strategy for very long pages.")
 
         self.driver.set_window_size(browser_width, max_height)
         time.sleep(0.3)
@@ -1137,7 +1211,10 @@ class AutoCaptureTool:
         current_zip = None  # Track current zip file for cleanup in finally block
         try:
             self.log("Starting zip creation...")
-            self.zip_btn.config(state=tk.DISABLED)
+            # Disable button on main thread (thread-safe)
+            def disable_button():
+                self.zip_btn.config(state=tk.DISABLED)
+            self.root.after(0, disable_button)
             
             # Collect all files to zip
             files_to_zip = []
@@ -1157,8 +1234,8 @@ class AutoCaptureTool:
             if not files_to_zip:
                 def show_no_files():
                     messagebox.showinfo("Zip", "No files found to zip.")
+                    self.zip_btn.config(state=tk.NORMAL)
                 self.root.after(0, show_no_files)
-                self.zip_btn.config(state=tk.NORMAL)
                 return
 
             self.log(f"Found {len(files_to_zip)} file(s) to zip...")
@@ -1176,7 +1253,8 @@ class AutoCaptureTool:
 
             for filepath, rel_path, file_size in files_to_zip:
                 # Check current zip file size on disk
-                current_zip.flush()  # Ensure data is written
+                # Note: ZipFile doesn't have flush(), we track size by checking the file on disk
+                # Close and reopen if needed, or just check file size directly
                 current_zip_size = os.path.getsize(current_zip_path) if os.path.exists(current_zip_path) else 0
                 
                 # Estimate compressed size (conservative: assume 40% compression for images)
