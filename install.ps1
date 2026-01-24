@@ -131,9 +131,9 @@ $allOk = $true
 foreach ($module in $modules) {
     & $venvPython -c "import $module" 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "  ✓ $module" -ForegroundColor Green
+        Write-Host "  [OK] $module" -ForegroundColor Green
     } else {
-        Write-Host "  ✗ $module - FAILED" -ForegroundColor Red
+        Write-Host "  [FAIL] $module" -ForegroundColor Red
         $allOk = $false
     }
 }
