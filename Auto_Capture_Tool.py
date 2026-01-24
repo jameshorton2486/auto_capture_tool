@@ -1,15 +1,18 @@
+"""
+Auto Capture Tool - Full Page Screenshot Automation
+Captures full-page screenshots using Selenium and Chrome DevTools Protocol.
+"""
+
 import base64
 import io
 import os
 import re
 import threading
 import time
-import tkinter as tk
 import urllib.error
 import urllib.request
 import zipfile
 from datetime import datetime
-from tkinter import filedialog, messagebox, scrolledtext, ttk
 from urllib.parse import urlparse
 
 from PIL import Image
@@ -19,6 +22,9 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from webdriver_manager.chrome import ChromeDriverManager
+
+import tkinter as tk
+from tkinter import filedialog, messagebox, scrolledtext, ttk
 
 
 # ======================================================
@@ -48,21 +54,14 @@ class AutoCaptureTool:
         self.root.title("Auto Full Page Capture Tool")
         self.root.configure(bg=DarkTheme.BG_MAIN)
 
-        # Resizable compact UI - optimized for smaller screens
-        # Detect screen size and adjust accordingly
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-
-        # Default compact size that fits most screens
         window_width = min(780, int(screen_width * 0.85))
-        window_height = min(560, int(screen_height * 0.85))
-
-        # Center window on screen
+        window_height = min(580, int(screen_height * 0.85))
         x = (screen_width - window_width) // 2
         y = (screen_height - window_height) // 2
-
         self.root.geometry(f"{window_width}x{window_height}+{x}+{y}")
-        self.root.minsize(680, 480)
+        self.root.minsize(680, 500)
 
         # TRACKERS
         self.items_to_process = []
@@ -161,6 +160,7 @@ class AutoCaptureTool:
             command=self.browse_folder,
             bg=DarkTheme.BG_INPUT,
             fg=DarkTheme.FG_TEXT,
+            font=("Arial", 9),
         )
         browse_btn.pack(side=tk.RIGHT, padx=5)
 
@@ -571,47 +571,43 @@ class AutoCaptureTool:
     # ==================================================
     #              SERVER CONNECTIVITY CHECK
     # ==================================================
-    def check_server_connectivity(self, url: str, timeout: int = 5):
-        """Check if the server is reachable before starting capture.
-        Returns (is_reachable, error_message)
-        Tries HEAD first, falls back to GET if HEAD is not supported.
-        """
+    def check_server_connectivity(self, url: str, timeout: int = 10):
+        """Check if the server is reachable before starting capture."""
         try:
             parsed = urlparse(url)
             test_url = f"{parsed.scheme}://{parsed.netloc}"
-
-            # Try HEAD request first (lighter, preferred)
+            headers = {
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/120.0.0.0 Safari/537.36"
+                )
+            }
             try:
-                req = urllib.request.Request(test_url, method="HEAD")
+                req = urllib.request.Request(test_url, method="HEAD", headers=headers)
                 urllib.request.urlopen(req, timeout=timeout)
                 return True, ""
             except urllib.error.HTTPError as e:
-                # HTTP error means server is reachable (even if it returns an error)
-                if e.code < 500:  # 4xx errors mean server is up
+                if e.code < 500:
                     return True, ""
                 return False, f"Server error: {e.code}"
             except urllib.error.URLError:
-                # HEAD failed, try GET as fallback (some servers don't support HEAD)
                 pass
-
-            # Fallback to GET request
             try:
-                req = urllib.request.Request(test_url, method="GET")
-                # Only read a small amount to avoid downloading full page
+                req = urllib.request.Request(test_url, method="GET", headers=headers)
                 with urllib.request.urlopen(req, timeout=timeout) as response:
-                    response.read(1)  # Read just 1 byte to verify connection
+                    response.read(1)
                 return True, ""
             except urllib.error.HTTPError as e:
-                # HTTP error means server is reachable
                 if e.code < 500:
                     return True, ""
                 return False, f"Server error: {e.code}"
             except urllib.error.URLError as e:
-                if "Connection refused" in str(e) or "ERR_CONNECTION_REFUSED" in str(e):
-                    return (
-                        False,
-                        f"Server not running at {parsed.netloc}. Start your dev server first (npm run dev).",
-                    )
+                error_str = str(e.reason)
+                if "Connection refused" in error_str:
+                    return False, f"Connection refused at {parsed.netloc}."
+                elif "getaddrinfo failed" in error_str:
+                    return False, f"Cannot resolve {parsed.netloc}. Check internet or URL."
                 return False, f"Cannot reach server: {e.reason}"
         except Exception as e:
             return False, f"Connection error: {str(e)}"
@@ -1503,8 +1499,8 @@ class AutoCaptureTool:
             self.log(f"Zip creation complete! Created {len(zip_files_created)} file(s).")
 
         except Exception as e:
-            self.log(f"Error creating zip: {e}")
             error_msg = str(e)
+            self.log(f"Error creating zip: {error_msg}")
 
             def show_error():
                 messagebox.showerror("Error", f"Failed to create zip file:\n{error_msg}")
