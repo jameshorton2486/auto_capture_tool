@@ -12,7 +12,6 @@ from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 from PIL import Image
@@ -25,16 +24,16 @@ import zipfile
 #                DARK THEME CONFIGURATION
 # ======================================================
 class DarkTheme:
-    BG_MAIN = "#1E1E1E"       # nearly black
-    BG_PANEL = "#252526"      # VS Code panel gray
+    BG_MAIN = "#1E1E1E"  # nearly black
+    BG_PANEL = "#252526"  # VS Code panel gray
     BG_INPUT = "#333333"
     FG_TEXT = "#FFFFFF"
     FG_MUTED = "#CCCCCC"
 
-    BTN_BLUE = "#0E639C"      # VS Code blue
-    BTN_GREEN = "#2EA043"     # success green
-    BTN_ORANGE = "#CE9178"    # warm orange
-    BTN_RED = "#B71C1C"       # danger red
+    BTN_BLUE = "#0E639C"  # VS Code blue
+    BTN_GREEN = "#2EA043"  # success green
+    BTN_ORANGE = "#CE9178"  # warm orange
+    BTN_RED = "#B71C1C"  # danger red
 
     BORDER = "#3C3C3C"
 
@@ -63,7 +62,7 @@ class AutoCaptureTool:
         self.user_logged_in = False  # Track if user has logged in during this session
         self.login_prompt_shown = False  # Only show login prompt once per capture session
         self.consecutive_connection_errors = 0  # Track connection refused errors
-        
+
         # Chrome profile directory for persistent sessions
         profile_dir = os.path.join(os.path.expanduser("~"), ".auto_capture_tool")
         os.makedirs(profile_dir, exist_ok=True)
@@ -105,10 +104,7 @@ class AutoCaptureTool:
             background=DarkTheme.BG_PANEL,
             foreground=DarkTheme.FG_TEXT,
         )
-        style.map(
-            "TButton",
-            background=[("active", DarkTheme.BG_INPUT)]
-        )
+        style.map("TButton", background=[("active", DarkTheme.BG_INPUT)])
         style.configure(
             "TEntry",
             fieldbackground=DarkTheme.BG_INPUT,
@@ -131,7 +127,7 @@ class AutoCaptureTool:
         self.root.grid_columnconfigure(0, weight=1)
         self.root.grid_rowconfigure(3, weight=1)
         self.root.grid_rowconfigure(4, weight=1)
-        
+
         # ---------- OUTPUT FOLDER ----------
         top_frame = ttk.Frame(self.root, style="Panel.TFrame", padding=10)
         top_frame.grid(row=0, column=0, sticky="ew")
@@ -151,7 +147,7 @@ class AutoCaptureTool:
             text="Browse...",
             command=self.browse_folder,
             bg=DarkTheme.BG_INPUT,
-            fg=DarkTheme.FG_TEXT
+            fg=DarkTheme.FG_TEXT,
         )
         browse_btn.pack(side=tk.RIGHT, padx=5)
 
@@ -178,10 +174,10 @@ class AutoCaptureTool:
             bg=DarkTheme.BG_PANEL,
             fg=DarkTheme.FG_TEXT,
             selectcolor=DarkTheme.BG_INPUT,
-            activebackground=DarkTheme.BG_PANEL
+            activebackground=DarkTheme.BG_PANEL,
         )
         chk.pack(anchor="w")
-        
+
         self.skip_login_var = tk.BooleanVar(value=False)
         chk_skip = tk.Checkbutton(
             opt_frame,
@@ -190,10 +186,10 @@ class AutoCaptureTool:
             bg=DarkTheme.BG_PANEL,
             fg=DarkTheme.FG_TEXT,
             selectcolor=DarkTheme.BG_INPUT,
-            activebackground=DarkTheme.BG_PANEL
+            activebackground=DarkTheme.BG_PANEL,
         )
         chk_skip.pack(anchor="w")
-        
+
         self.persist_session_var = tk.BooleanVar(value=False)
         chk_persist = tk.Checkbutton(
             opt_frame,
@@ -202,10 +198,10 @@ class AutoCaptureTool:
             bg=DarkTheme.BG_PANEL,
             fg=DarkTheme.FG_TEXT,
             selectcolor=DarkTheme.BG_INPUT,
-            activebackground=DarkTheme.BG_PANEL
+            activebackground=DarkTheme.BG_PANEL,
         )
         chk_persist.pack(anchor="w")
-        
+
         self.headless_var = tk.BooleanVar(value=False)
         chk_headless = tk.Checkbutton(
             opt_frame,
@@ -214,7 +210,7 @@ class AutoCaptureTool:
             bg=DarkTheme.BG_PANEL,
             fg=DarkTheme.FG_TEXT,
             selectcolor=DarkTheme.BG_INPUT,
-            activebackground=DarkTheme.BG_PANEL
+            activebackground=DarkTheme.BG_PANEL,
         )
         chk_headless.pack(anchor="w")
 
@@ -225,7 +221,7 @@ class AutoCaptureTool:
         ttk.Label(settings_frame, text="Format:", style="Panel.TLabel").pack(side=tk.LEFT)
 
         self.format_var = tk.StringVar(value="png")
-        for (text, value) in [("PNG", "png"), ("JPG", "jpg"), ("PDF", "pdf")]:
+        for text, value in [("PNG", "png"), ("JPG", "jpg"), ("PDF", "pdf")]:
             rb = tk.Radiobutton(
                 settings_frame,
                 text=text,
@@ -245,17 +241,14 @@ class AutoCaptureTool:
             settings_frame,
             textvariable=self.width_var,
             values=["1920", "1400", "1280", "1024", "768"],
-            width=6
+            width=6,
         )
         width_combo.pack(side=tk.LEFT)
 
         ttk.Label(settings_frame, text="Delay (sec):", style="Panel.TLabel").pack(side=tk.LEFT, padx=(20, 5))
         self.delay_var = tk.StringVar(value="2")
         delay_combo = ttk.Combobox(
-            settings_frame,
-            textvariable=self.delay_var,
-            values=["1", "2", "3", "5", "10"],
-            width=4
+            settings_frame, textvariable=self.delay_var, values=["1", "2", "3", "5", "10"], width=4
         )
         delay_combo.pack(side=tk.LEFT)
 
@@ -274,7 +267,7 @@ class AutoCaptureTool:
             fg=DarkTheme.FG_TEXT,
             insertbackground=DarkTheme.FG_TEXT,
             relief="flat",
-            borderwidth=1
+            borderwidth=1,
         )
         self.text_area.grid(row=1, column=0, sticky="nsew", pady=5)
 
@@ -292,7 +285,7 @@ class AutoCaptureTool:
             bg="#111111",
             fg="#E5E5E5",
             insertbackground="#E5E5E5",
-            relief="flat"
+            relief="flat",
         )
         self.log_box.grid(row=1, column=0, sticky="nsew", padx=10, pady=5)
 
@@ -307,7 +300,7 @@ class AutoCaptureTool:
             bg=DarkTheme.BTN_ORANGE,
             fg="black",
             padx=6,
-            pady=4
+            pady=4,
         )
         self.preview_btn.pack(side=tk.LEFT, padx=5)
 
@@ -318,7 +311,7 @@ class AutoCaptureTool:
             bg=DarkTheme.BTN_GREEN,
             fg="black",
             padx=6,
-            pady=4
+            pady=4,
         )
         self.start_btn.pack(side=tk.RIGHT, padx=5)
 
@@ -330,7 +323,7 @@ class AutoCaptureTool:
             bg=DarkTheme.BTN_RED,
             fg="white",
             padx=6,
-            pady=4
+            pady=4,
         )
         self.stop_btn.pack(side=tk.RIGHT, padx=5)
 
@@ -342,7 +335,7 @@ class AutoCaptureTool:
             bg=DarkTheme.BTN_BLUE,
             fg="white",
             padx=6,
-            pady=4
+            pady=4,
         )
         self.retry_btn.pack(side=tk.RIGHT, padx=5)
 
@@ -353,10 +346,10 @@ class AutoCaptureTool:
             bg=DarkTheme.BTN_ORANGE,
             fg="black",
             padx=6,
-            pady=4
+            pady=4,
         )
         self.zip_btn.pack(side=tk.LEFT, padx=5)
-        
+
         self.login_btn = tk.Button(
             btn_frame,
             text="Open Browser",
@@ -364,10 +357,10 @@ class AutoCaptureTool:
             bg=DarkTheme.BTN_BLUE,
             fg="white",
             padx=6,
-            pady=4
+            pady=4,
         )
         self.login_btn.pack(side=tk.LEFT, padx=5)
-        
+
         self.clear_profile_btn = tk.Button(
             btn_frame,
             text="Clear Profile",
@@ -375,7 +368,7 @@ class AutoCaptureTool:
             bg=DarkTheme.BG_INPUT,
             fg=DarkTheme.FG_TEXT,
             padx=6,
-            pady=4
+            pady=4,
         )
         self.clear_profile_btn.pack(side=tk.LEFT, padx=5)
 
@@ -384,11 +377,7 @@ class AutoCaptureTool:
         status_frame.grid(row=6, column=0, sticky="ew")
 
         self.progress_var = tk.StringVar(value="Ready")
-        self.progress_label = ttk.Label(
-            status_frame,
-            textvariable=self.progress_var,
-            style="Panel.TLabel"
-        )
+        self.progress_label = ttk.Label(status_frame, textvariable=self.progress_var, style="Panel.TLabel")
         self.progress_label.pack(side=tk.LEFT, padx=10)
 
         self.progress_bar = ttk.Progressbar(
@@ -404,7 +393,7 @@ class AutoCaptureTool:
         """Thread-safe logging method."""
         timestamp = datetime.now().strftime("[%H:%M:%S]")
         self.root.after(0, self._log_to_ui, f"{timestamp} {message}\n")
-    
+
     def _log_to_ui(self, message: str):
         """Internal method - runs on main thread."""
         self.log_box.insert(tk.END, message)
@@ -418,10 +407,10 @@ class AutoCaptureTool:
         """Validate if a URL is properly formatted."""
         try:
             result = urlparse(url)
-            return all([result.scheme in ('http', 'https'), result.netloc])
-        except:
+            return all([result.scheme in ("http", "https"), result.netloc])
+        except Exception:
             return False
-    
+
     @staticmethod
     def extract_urls(raw_text: str):
         pattern = r'https?://[^\s<>"\'`]+'
@@ -432,20 +421,20 @@ class AutoCaptureTool:
             # Remove trailing punctuation
             url = url.rstrip(".,;:)")
             # Remove trailing slash (normalize URLs)
-            url = url.rstrip('/')
+            url = url.rstrip("/")
             # Convert to lowercase for comparison
             return url.lower()
 
         unique = []
         seen = set()
-        
+
         for url in results:
             clean = url.rstrip(".,;:)")
             # Validate URL before adding
             if not AutoCaptureTool.validate_url(clean):
                 continue
             normalized = normalize_url_for_comparison(clean)
-            
+
             if normalized not in seen:
                 seen.add(normalized)
                 unique.append(clean)
@@ -467,7 +456,7 @@ class AutoCaptureTool:
         """Convert URL to Windows-safe file path."""
         parsed = urlparse(url)
         fmt = self.format_var.get()
-        
+
         # Windows invalid characters: < > : " / \ | ? *
         # Also handle port numbers in domain
         domain = parsed.netloc.replace(":", "-").replace(".", "_")
@@ -479,39 +468,60 @@ class AutoCaptureTool:
             return domain if self.include_domain_var.get() else "", f"index.{fmt}"
 
         parts = [p for p in path.split("/") if p]
-        
+
         # Windows reserved names that can't be used as filenames
-        windows_reserved = {'CON', 'PRN', 'AUX', 'NUL', 
-                           'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
-                           'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'}
-        
+        windows_reserved = {
+            "CON",
+            "PRN",
+            "AUX",
+            "NUL",
+            "COM1",
+            "COM2",
+            "COM3",
+            "COM4",
+            "COM5",
+            "COM6",
+            "COM7",
+            "COM8",
+            "COM9",
+            "LPT1",
+            "LPT2",
+            "LPT3",
+            "LPT4",
+            "LPT5",
+            "LPT6",
+            "LPT7",
+            "LPT8",
+            "LPT9",
+        }
+
         def sanitize_for_windows(name: str) -> str:
             """Sanitize a filename component for Windows."""
             if not name:
                 return "unnamed"
-            
+
             # Remove Windows invalid characters
             invalid_chars = '<>:"/\\|?*'
             cleaned = "".join(c for c in name if c not in invalid_chars)
-            
+
             # Remove leading/trailing dots and spaces (Windows doesn't allow these)
-            cleaned = cleaned.strip('. ')
-            
+            cleaned = cleaned.strip(". ")
+
             # Handle Windows reserved names
             if cleaned.upper() in windows_reserved:
                 cleaned = f"_{cleaned}"
-            
+
             # Ensure it's not empty after cleaning
             if not cleaned:
                 cleaned = "unnamed"
-            
+
             # Limit length to avoid Windows path issues (260 char limit for full path)
             # Keep individual component reasonable (max 100 chars)
             if len(cleaned) > 100:
                 cleaned = cleaned[:100]
-            
+
             return cleaned
-        
+
         clean_parts = [sanitize_for_windows(p) for p in parts]
 
         if len(clean_parts) == 1:
@@ -537,10 +547,10 @@ class AutoCaptureTool:
         try:
             parsed = urlparse(url)
             test_url = f"{parsed.scheme}://{parsed.netloc}"
-            
+
             # Try HEAD request first (lighter, preferred)
             try:
-                req = urllib.request.Request(test_url, method='HEAD')
+                req = urllib.request.Request(test_url, method="HEAD")
                 urllib.request.urlopen(req, timeout=timeout)
                 return True, ""
             except urllib.error.HTTPError as e:
@@ -551,10 +561,10 @@ class AutoCaptureTool:
             except urllib.error.URLError:
                 # HEAD failed, try GET as fallback (some servers don't support HEAD)
                 pass
-            
+
             # Fallback to GET request
             try:
-                req = urllib.request.Request(test_url, method='GET')
+                req = urllib.request.Request(test_url, method="GET")
                 # Only read a small amount to avoid downloading full page
                 with urllib.request.urlopen(req, timeout=timeout) as response:
                     response.read(1)  # Read just 1 byte to verify connection
@@ -566,7 +576,10 @@ class AutoCaptureTool:
                 return False, f"Server error: {e.code}"
             except urllib.error.URLError as e:
                 if "Connection refused" in str(e) or "ERR_CONNECTION_REFUSED" in str(e):
-                    return False, f"Server not running at {parsed.netloc}. Start your dev server first (npm run dev)."
+                    return (
+                        False,
+                        f"Server not running at {parsed.netloc}. Start your dev server first (npm run dev).",
+                    )
                 return False, f"Cannot reach server: {e.reason}"
         except Exception as e:
             return False, f"Connection error: {str(e)}"
@@ -609,25 +622,25 @@ class AutoCaptureTool:
         if folder:
             self.entry_dir.delete(0, tk.END)
             self.entry_dir.insert(0, folder)
-    
+
     def clear_chrome_profile(self):
         """Clear the Chrome profile directory to free up space."""
         if not os.path.exists(self.chrome_user_data_dir):
             messagebox.showinfo("Clear Profile", "Chrome profile directory does not exist.")
             return
-        
+
         # Confirm with user
         result = messagebox.askyesno(
             "Clear Chrome Profile",
             f"This will delete all saved Chrome profile data at:\n{self.chrome_user_data_dir}\n\n"
             "This will remove saved login sessions and cookies.\n\n"
             "Continue?",
-            icon="warning"
+            icon="warning",
         )
-        
+
         if not result:
             return
-        
+
         # Close browser if open
         if self.driver is not None:
             try:
@@ -636,10 +649,11 @@ class AutoCaptureTool:
                 self.log("Browser closed before clearing profile")
             except Exception as e:
                 self.log(f"Error closing browser: {e}")
-        
+
         # Delete profile directory
         try:
             import shutil
+
             shutil.rmtree(self.chrome_user_data_dir)
             self.log(f"Cleared Chrome profile: {self.chrome_user_data_dir}")
             messagebox.showinfo("Clear Profile", "Chrome profile cleared successfully.")
@@ -668,21 +682,23 @@ class AutoCaptureTool:
         # This also handles cases where URLs might be identical after normalization
         def normalize_url_comparison(url: str) -> str:
             """Normalize URL for deduplication."""
-            url = url.rstrip(".,;:)").rstrip('/').lower()
+            url = url.rstrip(".,;:)").rstrip("/").lower()
             return url
-        
+
         seen_urls = set()
         self.items_to_process = []
         for u in urls:
             normalized = normalize_url_comparison(u)
             if normalized not in seen_urls:
                 seen_urls.add(normalized)
-                self.items_to_process.append({
-                    "url": u,
-                    "subdir": self.url_to_filepath(u)[0],
-                    "filename": self.url_to_filepath(u)[1]
-                })
-        
+                self.items_to_process.append(
+                    {
+                        "url": u,
+                        "subdir": self.url_to_filepath(u)[0],
+                        "filename": self.url_to_filepath(u)[1],
+                    }
+                )
+
         if len(self.items_to_process) < len(urls):
             duplicates = len(urls) - len(self.items_to_process)
             self.log(f"Removed {duplicates} duplicate URL(s) after normalization")
@@ -693,13 +709,15 @@ class AutoCaptureTool:
             self.log(f"Checking server connectivity...")
             is_reachable, error_msg = self.check_server_connectivity(first_url)
             if not is_reachable:
-                messagebox.showerror("Server Not Running", 
+                messagebox.showerror(
+                    "Server Not Running",
                     f"{error_msg}\n\n"
                     "Make sure your development server is running:\n"
                     "1. Open a terminal in your project folder\n"
                     "2. Run: npm run dev\n"
                     "3. Wait for 'Ready' message\n"
-                    "4. Then click Start again")
+                    "4. Then click Start again",
+                )
                 return
             self.log("Server is reachable!")
 
@@ -712,7 +730,7 @@ class AutoCaptureTool:
         except ValueError:
             messagebox.showerror("Invalid Input", f"Width must be a number. Got: '{self.width_var.get()}'")
             return
-        
+
         try:
             delay = int(self.delay_var.get())
             if delay < 0 or delay > 60:
@@ -724,7 +742,7 @@ class AutoCaptureTool:
 
         # Clear failed items from previous capture runs
         self.failed_items = []
-        
+
         # Reset login tracking for new capture session
         self.user_logged_in = False
         self.login_prompt_shown = False
@@ -746,7 +764,7 @@ class AutoCaptureTool:
         if self.driver:
             try:
                 self.driver.execute_script("window.stop();")  # Stop page loading
-            except:
+            except Exception:
                 pass
 
     def retry_failed(self):
@@ -775,9 +793,12 @@ class AutoCaptureTool:
     def open_browser_for_login(self):
         """Open browser for manual login before capturing."""
         if self.driver is not None:
-            messagebox.showinfo("Browser Open", "Browser is already open. Close it first if you want to start fresh.")
+            messagebox.showinfo(
+                "Browser Open",
+                "Browser is already open. Close it first if you want to start fresh.",
+            )
             return
-        
+
         # Validate width input
         try:
             width = int(self.width_var.get())
@@ -788,25 +809,24 @@ class AutoCaptureTool:
             messagebox.showerror("Invalid Input", f"Width must be a number. Got: '{self.width_var.get()}'")
             return
         options = Options()
-        
+
         # Use persistent profile if enabled
         if self.persist_session_var.get():
             options.add_argument(f"--user-data-dir={self.chrome_user_data_dir}")
             self.log("Using persistent Chrome profile for login sessions")
-        
+
         try:
             self.log("Opening browser for manual login...")
-            self.driver = webdriver.Chrome(
-                service=Service(ChromeDriverManager().install()),
-                options=options
-            )
+            self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
             self.driver.set_window_size(width, 900)
             self.browser_opened_for_login = True
             self.log("Browser opened. Log in to sites as needed, then click 'Start' to capture.")
-            messagebox.showinfo("Browser Opened", 
+            messagebox.showinfo(
+                "Browser Opened",
                 "Browser is now open. You can log in to websites manually.\n\n"
                 "After logging in, click 'Start' to begin capturing.\n\n"
-                "Make sure 'Keep login sessions' is checked if you want to save your login.")
+                "Make sure 'Keep login sessions' is checked if you want to save your login.",
+            )
         except Exception as e:
             self.log(f"Error opening browser: {e}")
             messagebox.showerror("Error", f"Failed to open browser:\n{e}")
@@ -825,7 +845,7 @@ class AutoCaptureTool:
             except (ValueError, AttributeError):
                 self.log("ERROR: Invalid width value, using default 1400")
                 width = 1400
-            
+
             try:
                 delay = int(self.delay_var.get())
                 if delay < 0 or delay > 60:
@@ -838,11 +858,11 @@ class AutoCaptureTool:
             # Initialize browser if not already open
             if self.driver is None:
                 options = Options()
-                
+
                 # Add headless mode if enabled
                 if self.headless_var.get():
                     options.add_argument("--headless=new")
-                
+
                 # Use persistent profile if enabled
                 if self.persist_session_var.get():
                     options.add_argument(f"--user-data-dir={self.chrome_user_data_dir}")
@@ -852,10 +872,7 @@ class AutoCaptureTool:
 
                 def init_driver():
                     self.log("Initializing browser...")
-                    new_driver = webdriver.Chrome(
-                        service=Service(ChromeDriverManager().install()),
-                        options=options
-                    )
+                    new_driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
                     new_driver.set_window_size(width, 900)
                     # Set page load timeout
                     new_driver.set_page_load_timeout(60)
@@ -868,7 +885,7 @@ class AutoCaptureTool:
                 self.driver.set_page_load_timeout(60)
                 self.log("Reusing existing browser session")
             total = len(self.items_to_process)
-            
+
             # Maximum retries for failed captures
             MAX_RETRIES = 2
 
@@ -892,8 +909,7 @@ class AutoCaptureTool:
                         if self.headless_var.get():
                             options.add_argument("--headless=new")
                         self.driver = webdriver.Chrome(
-                            service=Service(ChromeDriverManager().install()),
-                            options=options
+                            service=Service(ChromeDriverManager().install()), options=options
                         )
                         self.driver.set_window_size(width, 900)
                         self.driver.set_page_load_timeout(60)
@@ -910,7 +926,15 @@ class AutoCaptureTool:
                     except Exception as browser_check_err:
                         # Only restart on specific exceptions that indicate browser is actually closed
                         error_str = str(browser_check_err).lower()
-                        if any(keyword in error_str for keyword in ['invalid session id', 'no such window', 'session deleted', 'target frame detached']):
+                        if any(
+                            keyword in error_str
+                            for keyword in [
+                                "invalid session id",
+                                "no such window",
+                                "session deleted",
+                                "target frame detached",
+                            ]
+                        ):
                             self.log("Browser was closed. Attempting to restart...")
                             try:
                                 # Recreate browser with same options
@@ -922,7 +946,7 @@ class AutoCaptureTool:
                                     options.add_argument("--headless=new")
                                 self.driver = webdriver.Chrome(
                                     service=Service(ChromeDriverManager().install()),
-                                    options=options
+                                    options=options,
                                 )
                                 self.driver.set_window_size(width, 900)
                                 self.driver.set_page_load_timeout(60)
@@ -938,18 +962,17 @@ class AutoCaptureTool:
 
                 # Retry logic for failed captures
                 capture_success = False
-                last_error = None
                 for attempt in range(MAX_RETRIES + 1):
                     if not self.is_running:
                         break
-                    
+
                     try:
                         self.driver.get(url)
-                        
+
                         # Wait for page to load (wait for document.readyState)
                         try:
                             WebDriverWait(self.driver, delay + 5).until(
-                                lambda d: d.execute_script('return document.readyState') == 'complete'
+                                lambda d: d.execute_script("return document.readyState") == "complete"
                             )
                         except TimeoutException:
                             if attempt < MAX_RETRIES:
@@ -958,28 +981,31 @@ class AutoCaptureTool:
                                 continue
                             else:
                                 self.log(f"Warning: Page load timeout for {url}, proceeding anyway...")
-                        
+
                         # Additional wait for dynamic content
                         time.sleep(1)
-                        
+
                         # Check if we're stuck on a login page
                         current_url = self.driver.current_url.lower()
                         original_url_lower = url.lower()
                         page_title = self.driver.title.lower()
                         page_source = self.driver.page_source.lower()[:10000]  # Sample first 10k chars for performance
-                        
+
                         # Common login page indicators (only check if URL changed significantly)
                         is_login_page = False
                         if current_url != original_url_lower:
                             login_indicators = [
-                                '/login' in current_url or '/signin' in current_url or '/auth' in current_url,
-                                'sign in' in page_title or 'log in' in page_title,
-                                'authentication required' in page_title,
-                                (('password' in page_source and 'email' in page_source) or 
-                                 ('password' in page_source and 'username' in page_source)) and len(page_source) < 30000
+                                "/login" in current_url or "/signin" in current_url or "/auth" in current_url,
+                                "sign in" in page_title or "log in" in page_title,
+                                "authentication required" in page_title,
+                                (
+                                    ("password" in page_source and "email" in page_source)
+                                    or ("password" in page_source and "username" in page_source)
+                                )
+                                and len(page_source) < 30000,
                             ]
                             is_login_page = any(login_indicators)
-                        
+
                         if is_login_page:
                             if self.skip_login_var.get():
                                 self.log(f"SKIPPED (login required): {url}")
@@ -995,12 +1021,12 @@ class AutoCaptureTool:
                                 # First time seeing login page - give user a chance to log in
                                 self.log(f"⚠ LOGIN PAGE DETECTED: {self.driver.current_url}")
                                 self.log(f"   Original URL: {url}")
-                                
+
                                 if not self.login_prompt_shown:
                                     self.login_prompt_shown = True
                                     self.log("👉 Log in now in the browser window (waiting 10 seconds)...")
                                     self.log("   TIP: Use 'Open Browser' button next time to log in first!")
-                                    
+
                                     # Wait up to 10 seconds for user to log in (reduced from 30)
                                     login_page_url = current_url
                                     for wait_attempt in range(2):  # 2 * 5 = 10 seconds
@@ -1009,7 +1035,11 @@ class AutoCaptureTool:
                                             break
                                         try:
                                             current_url_after_wait = self.driver.current_url.lower()
-                                            if current_url_after_wait != login_page_url and '/login' not in current_url_after_wait and '/signin' not in current_url_after_wait:
+                                            if (
+                                                current_url_after_wait != login_page_url
+                                                and "/login" not in current_url_after_wait
+                                                and "/signin" not in current_url_after_wait
+                                            ):
                                                 self.log("✓ Login detected! Continuing with authenticated session...")
                                                 self.user_logged_in = True
                                                 # Re-navigate to original URL now that we're logged in
@@ -1018,12 +1048,14 @@ class AutoCaptureTool:
                                                 break
                                         except Exception:
                                             break
-                                    
+
                                     if not self.user_logged_in:
                                         self.log("⚠ No login detected. Capturing login pages for protected URLs.")
-                                        self.log("   To capture actual pages: Stop, click 'Open Browser', log in, then Start again.")
+                                        self.log(
+                                            "   To capture actual pages: Stop, click 'Open Browser', log in, then Start again."
+                                        )
                                         self.failed_items.append(item)
-                                
+
                                 self.log("Continuing...")
 
                         # Cookies are preserved between pages to maintain login sessions
@@ -1036,9 +1068,8 @@ class AutoCaptureTool:
                         self.log(f"✓ Saved {item['filename']}")
                         capture_success = True
                         break
-                        
+
                     except TimeoutException as e:
-                        last_error = e
                         if attempt < MAX_RETRIES:
                             self.log(f"Retry {attempt + 1}/{MAX_RETRIES} for {url} (timeout)")
                             time.sleep(2)
@@ -1046,9 +1077,8 @@ class AutoCaptureTool:
                             self.log(f"Failed after {MAX_RETRIES + 1} attempts: {url} - {e}")
                             self.failed_items.append(item)
                     except Exception as e:
-                        last_error = e
                         error_str = str(e)
-                        
+
                         # Track connection refused errors
                         if "net::ERR_CONNECTION_REFUSED" in error_str:
                             self.consecutive_connection_errors += 1
@@ -1067,7 +1097,7 @@ class AutoCaptureTool:
                                 remaining_items = self.items_to_process[i:]
                                 self.failed_items.extend(remaining_items)
                                 break
-                        
+
                         if attempt < MAX_RETRIES:
                             self.log(f"Retry {attempt + 1}/{MAX_RETRIES} for {url} (error: {str(e)[:50]})")
                             time.sleep(2)
@@ -1076,11 +1106,11 @@ class AutoCaptureTool:
                             self.failed_items.append(item)
                             if "net::ERR_CONNECTION_REFUSED" in error_str:
                                 self.log("⚠ Server connection refused - is your dev server running?")
-                
+
                 # Reset connection error counter on successful capture
                 if capture_success:
                     self.consecutive_connection_errors = 0
-                
+
                 if not capture_success:
                     self.log(f"Failed to capture {url}")
                     continue
@@ -1089,21 +1119,27 @@ class AutoCaptureTool:
                 self.log(f"Finished processing all {total} URLs")
                 # Update progress bar to 100% on completion
                 self._update_progress("Complete", len(self.items_to_process))
-                
+
                 # Calculate success count
                 success_count = total - len(self.failed_items)
                 self.log(f"Summary: {success_count} succeeded, {len(self.failed_items)} failed out of {total} total")
-                
+
                 if self.failed_items:
                     self.log(f"Failed URLs: {[item['url'] for item in self.failed_items]}")
+
                     def show_warning():
-                        messagebox.showwarning("Done with Errors",
-                            f"Capture completed:\n{success_count} succeeded\n{len(self.failed_items)} failed\n\nClick 'Retry Failed' to retry the failed URLs.")
+                        messagebox.showwarning(
+                            "Done with Errors",
+                            f"Capture completed:\n{success_count} succeeded\n{len(self.failed_items)} failed\n\nClick 'Retry Failed' to retry the failed URLs.",
+                        )
+
                     self.root.after(0, show_warning)
                 else:
                     self.log("Capture process finished successfully - all URLs captured!")
+
                     def show_success():
                         messagebox.showinfo("Done", f"Capture completed successfully!\n\nAll {total} URLs captured.")
+
                     self.root.after(0, show_success)
 
         except Exception as e:
@@ -1126,7 +1162,7 @@ class AutoCaptureTool:
     def _update_progress(self, msg, value):
         """Thread-safe progress update."""
         self.root.after(0, self._do_update_progress, msg, value)
-    
+
     def _do_update_progress(self, msg, value):
         """Internal method - runs on main thread."""
         self.progress_var.set(msg)
@@ -1152,15 +1188,13 @@ class AutoCaptureTool:
     # ==================================================
     def _capture_full_page(self):
         total_height = self.driver.execute_script(
-            "return Math.max("
-            "document.body.scrollHeight,"
-            "document.documentElement.scrollHeight)"
+            "return Math.max(" "document.body.scrollHeight," "document.documentElement.scrollHeight)"
         )
 
         browser_width = int(self.width_var.get())
         MAX_CAPTURE_HEIGHT = 16000  # Windows-safe limit
         max_height = min(total_height + 200, MAX_CAPTURE_HEIGHT)
-        
+
         # Warn if page is longer than capture limit
         if total_height > MAX_CAPTURE_HEIGHT:
             self.log(f"⚠ WARNING: Page height ({total_height}px) exceeds capture limit ({MAX_CAPTURE_HEIGHT}px)")
@@ -1178,10 +1212,7 @@ class AutoCaptureTool:
         self.driver.execute_script("window.scrollTo(0, 0);")
         time.sleep(0.2)
 
-        data = self.driver.execute_cdp_cmd("Page.captureScreenshot", {
-            "format": "png",
-            "captureBeyondViewport": True
-        })
+        data = self.driver.execute_cdp_cmd("Page.captureScreenshot", {"format": "png", "captureBeyondViewport": True})
 
         return base64.b64decode(data["data"])
 
@@ -1193,21 +1224,21 @@ class AutoCaptureTool:
         filepath = os.path.join(folder, filename)
         if not os.path.exists(filepath):
             return filepath
-        
+
         base, ext = os.path.splitext(filename)
         counter = 1
         while os.path.exists(filepath):
             filepath = os.path.join(folder, f"{base}_{counter}{ext}")
             counter += 1
         return filepath
-    
+
     def _save_file(self, item, screenshot_bytes):
         """Save screenshot file with Windows-safe path handling."""
         folder = os.path.join(self.root_save_directory, item["subdir"]) if item["subdir"] else self.root_save_directory
-        
+
         # Ensure folder path is absolute and normalized for Windows
         folder = os.path.normpath(os.path.abspath(folder))
-        
+
         try:
             os.makedirs(folder, exist_ok=True)
         except OSError as e:
@@ -1246,15 +1277,15 @@ class AutoCaptureTool:
         # Ask user where to save the zip file(s)
         zip_dir = os.path.dirname(self.root_save_directory) if self.root_save_directory else os.path.expanduser("~")
         default_zip_name = os.path.join(zip_dir, f"captures_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip")
-        
+
         zip_path = filedialog.asksaveasfilename(
             title="Save Zip File",
             defaultextension=".zip",
             initialfile=os.path.basename(default_zip_name),
             initialdir=zip_dir,
-            filetypes=[("Zip files", "*.zip"), ("All files", "*.*")]
+            filetypes=[("Zip files", "*.zip"), ("All files", "*.*")],
         )
-        
+
         if not zip_path:
             return  # User cancelled
 
@@ -1264,34 +1295,38 @@ class AutoCaptureTool:
     def _create_zip_files(self, zip_path_base):
         """Create zip file(s) from all files in save directory. Splits if > 29MB."""
         MAX_ZIP_SIZE = 29 * 1024 * 1024  # 29 MB in bytes
-        
+
         current_zip = None  # Track current zip file for cleanup in finally block
         try:
             self.log("Starting zip creation...")
+
             # Disable button on main thread (thread-safe)
             def disable_button():
                 self.zip_btn.config(state=tk.DISABLED)
+
             self.root.after(0, disable_button)
-            
+
             # Collect all files to zip
             files_to_zip = []
             save_dir = self.root_save_directory
-            
+
             for root, dirs, filenames in os.walk(save_dir):
                 # Skip zip files themselves
                 for filename in filenames:
-                    if filename.endswith('.zip'):
+                    if filename.endswith(".zip"):
                         continue
                     filepath = os.path.join(root, filename)
                     # Get relative path from save directory for archive
                     rel_path = os.path.relpath(filepath, save_dir)
                     file_size = os.path.getsize(filepath)
                     files_to_zip.append((filepath, rel_path, file_size))
-            
+
             if not files_to_zip:
+
                 def show_no_files():
                     messagebox.showinfo("Zip", "No files found to zip.")
                     self.zip_btn.config(state=tk.NORMAL)
+
                 self.root.after(0, show_no_files)
                 return
 
@@ -1305,7 +1340,7 @@ class AutoCaptureTool:
             # Create first zip file
             zip_index = 1
             current_zip_path = os.path.join(zip_dir, f"{zip_basename}{zip_ext}")
-            current_zip = zipfile.ZipFile(current_zip_path, 'w', zipfile.ZIP_DEFLATED)
+            current_zip = zipfile.ZipFile(current_zip_path, "w", zipfile.ZIP_DEFLATED)
             zip_files_created = []
 
             for filepath, rel_path, file_size in files_to_zip:
@@ -1313,11 +1348,11 @@ class AutoCaptureTool:
                 # Note: ZipFile doesn't have flush(), we track size by checking the file on disk
                 # Close and reopen if needed, or just check file size directly
                 current_zip_size = os.path.getsize(current_zip_path) if os.path.exists(current_zip_path) else 0
-                
+
                 # Estimate compressed size (conservative: assume 40% compression for images)
                 # Add overhead for ZIP entry metadata
                 estimated_size_after_add = current_zip_size + (file_size * 0.4) + 500
-                
+
                 # If adding this file would exceed limit, start a new zip
                 if estimated_size_after_add > MAX_ZIP_SIZE and current_zip_size > 0:
                     # Close current zip
@@ -1325,11 +1360,11 @@ class AutoCaptureTool:
                     actual_size = os.path.getsize(current_zip_path)
                     zip_files_created.append(current_zip_path)
                     self.log(f"Created {os.path.basename(current_zip_path)} ({actual_size / 1024 / 1024:.2f} MB)")
-                    
+
                     # Start new zip
                     zip_index += 1
                     current_zip_path = os.path.join(zip_dir, f"{zip_basename}_part{zip_index}{zip_ext}")
-                    current_zip = zipfile.ZipFile(current_zip_path, 'w', zipfile.ZIP_DEFLATED)
+                    current_zip = zipfile.ZipFile(current_zip_path, "w", zipfile.ZIP_DEFLATED)
 
                 # Add file to current zip
                 try:
@@ -1341,7 +1376,7 @@ class AutoCaptureTool:
             # Close the last zip file
             current_zip.close()
             zip_files_created.append(current_zip_path)
-            
+
             # Get actual file size
             final_size = os.path.getsize(current_zip_path)
             final_size_mb = final_size / 1024 / 1024
@@ -1350,23 +1385,34 @@ class AutoCaptureTool:
             # Show completion message (must be called from main thread)
             def show_completion():
                 if len(zip_files_created) == 1:
-                    messagebox.showinfo("Zip Complete", f"Successfully created zip file:\n{os.path.basename(zip_files_created[0])}\n\nSize: {final_size_mb:.2f} MB")
+                    messagebox.showinfo(
+                        "Zip Complete",
+                        f"Successfully created zip file:\n{os.path.basename(zip_files_created[0])}\n\nSize: {final_size_mb:.2f} MB",
+                    )
                 else:
                     total_size = sum(os.path.getsize(f) for f in zip_files_created)
                     total_size_mb = total_size / 1024 / 1024
-                    file_list = "\n".join([f"{os.path.basename(f)} ({os.path.getsize(f) / 1024 / 1024:.2f} MB)" for f in zip_files_created])
+                    file_list = "\n".join(
+                        [
+                            f"{os.path.basename(f)} ({os.path.getsize(f) / 1024 / 1024:.2f} MB)"
+                            for f in zip_files_created
+                        ]
+                    )
                     messagebox.showinfo(
                         "Zip Complete",
-                        f"Created {len(zip_files_created)} zip file(s):\n\n{file_list}\n\nTotal size: {total_size_mb:.2f} MB"
+                        f"Created {len(zip_files_created)} zip file(s):\n\n{file_list}\n\nTotal size: {total_size_mb:.2f} MB",
                     )
+
             self.root.after(0, show_completion)
-            
+
             self.log(f"Zip creation complete! Created {len(zip_files_created)} file(s).")
 
         except Exception as e:
             self.log(f"Error creating zip: {e}")
+
             def show_error():
                 messagebox.showerror("Error", f"Failed to create zip file:\n{e}")
+
             self.root.after(0, show_error)
         finally:
             # Ensure zip file is closed even if an exception occurred
@@ -1375,9 +1421,11 @@ class AutoCaptureTool:
                     current_zip.close()
                 except Exception:
                     pass  # Ignore errors when closing in cleanup
+
             # Re-enable button on main thread (thread-safe GUI modification)
             def enable_button():
                 self.zip_btn.config(state=tk.NORMAL)
+
             self.root.after(0, enable_button)
 
 
