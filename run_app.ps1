@@ -45,12 +45,40 @@ if ($paths.Count -ge 2) {
 Write-Host "Starting Auto Capture Tool..." -ForegroundColor Cyan
 Write-Host ""
 
+# Check if venv is properly set up (has pip)
+$hasPip = $false
+try {
+    $pipCheck = & $venvPython -m pip --version 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        $hasPip = $true
+    }
+} catch {
+    $hasPip = $false
+}
+
+if (-not $hasPip) {
+    Write-Host "ERROR: Virtual environment is corrupted (pip not found)!" -ForegroundColor Red
+    Write-Host "Please run the installation script to recreate it:" -ForegroundColor Yellow
+    Write-Host "  .\install.ps1" -ForegroundColor Cyan
+    Write-Host ""
+    Read-Host "Press Enter to exit"
+    exit 1
+}
+
 # Ensure selenium is available inside the venv
-& $venvPython -c "import selenium" 2>$null
+$seleniumCheck = & $venvPython -c "import selenium" 2>&1
 if ($LASTEXITCODE -ne 0) {
-  Write-Host "Installing required packages..." -ForegroundColor Yellow
-  & $venvPython -m pip install -r requirements.txt
-  Write-Host "";
+    Write-Host "Installing required packages..." -ForegroundColor Yellow
+    & $venvPython -m pip install -r requirements.txt
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "ERROR: Failed to install dependencies!" -ForegroundColor Red
+        Write-Host "Please run: .\install.ps1" -ForegroundColor Yellow
+        Write-Host ""
+        Read-Host "Press Enter to exit"
+        exit 1
+    }
+    Write-Host "Dependencies installed successfully" -ForegroundColor Green
+    Write-Host "";
 }
 
 # Run the application

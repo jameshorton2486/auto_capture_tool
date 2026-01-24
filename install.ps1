@@ -109,7 +109,7 @@ if (Test-Path "venv") {
         } catch {
             $retryCount++
             if ($retryCount -lt $maxRetries) {
-                Write-Host "Retry $retryCount/$maxRetries: Waiting for files to be released..." -ForegroundColor Yellow
+                Write-Host "Retry ${retryCount}/${maxRetries}: Waiting for files to be released..." -ForegroundColor Yellow
                 Start-Sleep -Seconds 2
             } else {
                 Write-Host "WARNING: Could not remove old venv. Please close any Python processes and try again." -ForegroundColor Red
