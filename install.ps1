@@ -80,8 +80,44 @@ Write-Host ""
 # Check if venv exists, remove it if it does (to recreate with correct Python)
 if (Test-Path "venv") {
     Write-Host "Existing virtual environment found. Removing it..." -ForegroundColor Yellow
-    Remove-Item -Recurse -Force "venv"
-    Write-Host "Removed old virtual environment" -ForegroundColor Green
+    
+    # Try to deactivate venv if it's active (PowerShell)
+    if ($env:VIRTUAL_ENV) {
+        Write-Host "Deactivating active virtual environment..." -ForegroundColor Yellow
+        deactivate 2>$null
+        Start-Sleep -Milliseconds 500
+    }
+    
+    # Kill any Python processes that might be using the venv
+    $venvPython = Join-Path $ScriptDir "venv\Scripts\python.exe"
+    if (Test-Path $venvPython) {
+        Write-Host "Closing any processes using the virtual environment..." -ForegroundColor Yellow
+        Get-Process | Where-Object { $_.Path -eq $venvPython } | Stop-Process -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 500
+    }
+    
+    # Try to remove, with retry logic
+    $maxRetries = 3
+    $retryCount = 0
+    $removed = $false
+    
+    while (-not $removed -and $retryCount -lt $maxRetries) {
+        try {
+            Remove-Item -Recurse -Force "venv" -ErrorAction Stop
+            $removed = $true
+            Write-Host "Removed old virtual environment" -ForegroundColor Green
+        } catch {
+            $retryCount++
+            if ($retryCount -lt $maxRetries) {
+                Write-Host "Retry $retryCount/$maxRetries: Waiting for files to be released..." -ForegroundColor Yellow
+                Start-Sleep -Seconds 2
+            } else {
+                Write-Host "WARNING: Could not remove old venv. Please close any Python processes and try again." -ForegroundColor Red
+                Write-Host "You can manually delete the 'venv' folder and run this script again." -ForegroundColor Yellow
+                Read-Host "Press Enter to continue anyway (will try to create new venv)"
+            }
+        }
+    }
     Write-Host ""
 }
 
