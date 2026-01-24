@@ -444,19 +444,55 @@ class AutoCaptureTool:
         return img
 
     def url_to_filepath(self, url: str):
+        """Convert URL to Windows-safe file path."""
         parsed = urlparse(url)
         fmt = self.format_var.get()
+        
+        # Windows invalid characters: < > : " / \ | ? *
+        # Also handle port numbers in domain
         domain = parsed.netloc.replace(":", "-").replace(".", "_")
+        # Remove any remaining invalid chars from domain
+        domain = "".join(c for c in domain if c.isalnum() or c in "-_")
 
         path = parsed.path.strip("/")
         if not path:
             return domain if self.include_domain_var.get() else "", f"index.{fmt}"
 
         parts = [p for p in path.split("/") if p]
-        clean_parts = [
-            "".join(c for c in p if c.isalnum() or c in "-_.")
-            for p in parts
-        ]
+        
+        # Windows reserved names that can't be used as filenames
+        windows_reserved = {'CON', 'PRN', 'AUX', 'NUL', 
+                           'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
+                           'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'}
+        
+        def sanitize_for_windows(name: str) -> str:
+            """Sanitize a filename component for Windows."""
+            if not name:
+                return "unnamed"
+            
+            # Remove Windows invalid characters
+            invalid_chars = '<>:"/\\|?*'
+            cleaned = "".join(c for c in name if c not in invalid_chars)
+            
+            # Remove leading/trailing dots and spaces (Windows doesn't allow these)
+            cleaned = cleaned.strip('. ')
+            
+            # Handle Windows reserved names
+            if cleaned.upper() in windows_reserved:
+                cleaned = f"_{cleaned}"
+            
+            # Ensure it's not empty after cleaning
+            if not cleaned:
+                cleaned = "unnamed"
+            
+            # Limit length to avoid Windows path issues (260 char limit for full path)
+            # Keep individual component reasonable (max 100 chars)
+            if len(cleaned) > 100:
+                cleaned = cleaned[:100]
+            
+            return cleaned
+        
+        clean_parts = [sanitize_for_windows(p) for p in parts]
 
         if len(clean_parts) == 1:
             filename = f"{clean_parts[0]}.{fmt}"
@@ -473,7 +509,7 @@ class AutoCaptureTool:
     # ==================================================
     #              SERVER CONNECTIVITY CHECK
     # ==================================================
-    def check_server_connectivity(self, url: str, timeout: int = 5) -> tuple[bool, str]:
+    def check_server_connectivity(self, url: str, timeout: int = 5):
         """Check if the server is reachable before starting capture.
         Returns (is_reachable, error_message)
         """
@@ -1035,8 +1071,19 @@ class AutoCaptureTool:
         return filepath
     
     def _save_file(self, item, screenshot_bytes):
+        """Save screenshot file with Windows-safe path handling."""
         folder = os.path.join(self.root_save_directory, item["subdir"]) if item["subdir"] else self.root_save_directory
-        os.makedirs(folder, exist_ok=True)
+        
+        # Ensure folder path is absolute and normalized for Windows
+        folder = os.path.normpath(os.path.abspath(folder))
+        
+        try:
+            os.makedirs(folder, exist_ok=True)
+        except OSError as e:
+            self.log(f"Error creating folder {folder}: {e}")
+            # Fallback to root directory if subfolder creation fails
+            folder = self.root_save_directory
+            os.makedirs(folder, exist_ok=True)
 
         filepath = self._get_unique_filepath(folder, item["filename"])
         fmt = self.format_var.get()
