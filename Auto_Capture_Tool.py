@@ -1,23 +1,24 @@
-import tkinter as tk
-from tkinter import scrolledtext, messagebox, filedialog, ttk
-import re
-import os
-import time
 import base64
-from datetime import datetime
-from urllib.parse import urlparse
-import urllib.request
-import urllib.error
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.common.exceptions import TimeoutException
-from webdriver_manager.chrome import ChromeDriverManager
-from PIL import Image
 import io
+import os
+import re
 import threading
+import time
+import tkinter as tk
+import urllib.error
+import urllib.request
 import zipfile
+from datetime import datetime
+from tkinter import filedialog, messagebox, scrolledtext, ttk
+from urllib.parse import urlparse
+
+from PIL import Image
+from selenium import webdriver
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.ui import WebDriverWait
+from webdriver_manager.chrome import ChromeDriverManager
 
 
 # ======================================================
@@ -706,7 +707,7 @@ class AutoCaptureTool:
         # Check server connectivity before starting (unless browser is already open)
         if not self.browser_opened_for_login and self.driver is None:
             first_url = self.items_to_process[0]["url"]
-            self.log(f"Checking server connectivity...")
+            self.log("Checking server connectivity...")
             is_reachable, error_msg = self.check_server_connectivity(first_url)
             if not is_reachable:
                 messagebox.showerror(
@@ -737,7 +738,7 @@ class AutoCaptureTool:
                 messagebox.showerror("Invalid Input", "Delay must be between 0 and 60 seconds.")
                 return
         except ValueError:
-            messagebox.showerror("Invalid Input", f"Delay must be a number. Got: '{self.delay_var.get()}'")
+            messagebox.showerror("Invalid Input", "Delay must be a number. Got: '{}'".format(self.delay_var.get()))
             return
 
         # Clear failed items from previous capture runs
@@ -1198,7 +1199,7 @@ class AutoCaptureTool:
         # Warn if page is longer than capture limit
         if total_height > MAX_CAPTURE_HEIGHT:
             self.log(f"⚠ WARNING: Page height ({total_height}px) exceeds capture limit ({MAX_CAPTURE_HEIGHT}px)")
-            self.log(f"   Page will be truncated. Consider using a tiling strategy for very long pages.")
+            self.log("   Page will be truncated. Consider using a tiling strategy for very long pages.")
 
         self.driver.set_window_size(browser_width, max_height)
         time.sleep(0.3)
@@ -1409,9 +1410,10 @@ class AutoCaptureTool:
 
         except Exception as e:
             self.log(f"Error creating zip: {e}")
+            error_msg = str(e)
 
             def show_error():
-                messagebox.showerror("Error", f"Failed to create zip file:\n{e}")
+                messagebox.showerror("Error", f"Failed to create zip file:\n{error_msg}")
 
             self.root.after(0, show_error)
         finally:
