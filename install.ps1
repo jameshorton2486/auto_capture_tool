@@ -14,18 +14,37 @@ Write-Host ""
 Write-Host "Checking Python installation..." -ForegroundColor Yellow
 
 # Try py launcher first (most reliable on Windows, avoids alias issues)
+# Prefer Python 3.13 specifically, then fall back to 3.x
 $pythonCmd = $null
 $usePyLauncher = $false
+$pythonVersion = $null
 
+# Try Python 3.13 first (recommended)
 try {
-    $pyVersion = py -3 --version 2>&1
+    $pyVersion = py -3.13 --version 2>&1
     if ($LASTEXITCODE -eq 0) {
         $pythonCmd = "py"
+        $pythonVersion = "3.13"
         $usePyLauncher = $true
-        Write-Host "Found: $pyVersion (using Python launcher)" -ForegroundColor Green
+        Write-Host "Found: $pyVersion (using Python 3.13 launcher)" -ForegroundColor Green
     }
 } catch {
-    # py launcher not available, try python command
+    # Python 3.13 not found, try any 3.x
+}
+
+# If 3.13 not found, try any Python 3.x
+if (-not $pythonCmd) {
+    try {
+        $pyVersion = py -3 --version 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            $pythonCmd = "py"
+            $pythonVersion = "3"
+            $usePyLauncher = $true
+            Write-Host "Found: $pyVersion (using Python launcher)" -ForegroundColor Green
+        }
+    } catch {
+        # py launcher not available, try python command
+    }
 }
 
 # If py launcher didn't work, try direct python command
@@ -69,7 +88,11 @@ if (Test-Path "venv") {
 # Create virtual environment
 Write-Host "Creating virtual environment..." -ForegroundColor Yellow
 if ($usePyLauncher) {
-    py -3 -m venv venv
+    if ($pythonVersion -eq "3.13") {
+        py -3.13 -m venv venv
+    } else {
+        py -3 -m venv venv
+    }
 } else {
     & $pythonCmd -m venv venv
 }
